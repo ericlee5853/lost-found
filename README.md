@@ -28,26 +28,90 @@ npm run lint    # 문법 검사
 ## 데이터 구조
 
 DB 로 옮길 때 그대로 테이블이 되도록 아래 구조를 따른다.
-
+  컬럼	타입	제약	설명
 ```
-item_category (물품구분)
-  id, name, storage_months, expire_action, sort_order, is_active
 
-process_result (처리결과)
-  id, name, sort_order, is_active
+item_category(물품구분-설정페이지 변경 가능){
+  id	INT	PK, AUTO_INCREMENT,
+  name	VARCHAR(50)	NOT NULL,                 [UNIQUE	신분증, 전자기기 등]
+  storage_months	INT	NOT NULL	              [보관기간(개월). 0이면 미보관]
+  expire_action	VARCHAR(50)	NULL	            [폐기 / 관할 지구대 인계 등]
+  sort_order	INT	NOT NULL, DEFAULT 0	        [선택창 표시 순서]
+  is_active	BOOLEAN	NOT NULL, DEFAULT true	  [false면 신규 등록 시 숨김]
+}
 
-found_item (유실물)
-  manageNo(관리번호), receivedDate, foundDate, itemName, feature,
-  lostPlace(분실 장소), owner, ownerContact, contacted, storagePlace, checker, image,
-  category_id  → item_category.id 참조
-  result_id    → process_result.id 참조
-  deadline     ← 등록 시점에 계산해 저장 (설정 변경과 무관)
 
-lost_report (분실신고)   ※ 사진은 붙이지 않는다
-  manageNo, receivedDate, foundDate, itemName, feature,
-  lostPlace(분실 장소), owner, ownerContact, status, processedDate, checker,
-  category_id  → item_category.id 참조
-```
+process_result(처리결과-설정페이지 변경 가능){
+  id	INT	PK, AUTO_INCREMENT
+  name	VARCHAR(50)	NOT NULL, UNIQUE          [미처리, 본인반환, 폐기, 관할서인계]
+  sort_order	INT	NOT NULL, DEFAULT 0	
+  is_active	BOOLEAN	NOT NULL, DEFAULT true	
+}
+
+
+ report_status(분실신고 처리상태-설정페이지 변경 가능){
+  id	INT	PK, AUTO_INCREMENT	
+  name	VARCHAR(50)	NOT NULL, UNIQUE	        [미처리, 처리완료]
+  sort_order	INT	NOT NULL, DEFAULT 0	
+  is_active	BOOLEAN	NOT NULL, DEFAULT true
+}
+
+
+
+found_item (유실물){
+  id	BIGINT	PK, AUTO_INCREMENT	            [내부 식별자]
+  manage_no	VARCHAR(20)	NOT NULL, UNIQUE	    [20260001 형식]
+  received_date	DATE	NOT NULL	              [접수일]
+  found_date	DATE	NOT NULL	                [습득일]
+  category_id	INT	NOT NULL, FK → item_category[물품 구분]
+  item_name	VARCHAR(100)	NOT NULL            [물품명]
+  feature	VARCHAR(500)	NULL	                [특징]
+  owner_name	VARCHAR(50)	NULL	              [소유자]
+  owner_contact	VARCHAR(20)	NULL	            [소유자 연락처]
+  contacted	CHAR(1)	NOT NULL, DEFAULT 'X'	    [연락여부 O/X]
+  storage_place	VARCHAR(100)	NULL	          [보관장소]
+  deadline	DATE	NULL	                      [등록 시점에 계산해 저장]
+  result_id	INT	NOT NULL, FK → process_result	[처리결과]
+  processed_date	DATE	NULL	                [처리일]
+  checker_id	INT	NULL, FK → app_user	        [확인자]
+  image_path	VARCHAR(255)	NULL	            [이미지 파일 경로]
+  created_at	DATETIME	NOT NULL	
+  updated_at	DATETIME	NOT NULL
+}
+
+lost_report (분실신고){
+  id	BIGINT	PK, AUTO_INCREMENT	
+  manage_no	VARCHAR(20)	NOT NULL, UNIQUE                                    [20261001 형식]
+  received_date	DATE	NOT NULL	                                            [접수일]
+  found_date	DATE	NOT NULL	                                              [습득일]
+  category_id	INT	NOT NULL, FK → item_category	FK from item_category
+  item_name	VARCHAR(100)	NOT NULL	
+  feature	VARCHAR(500)	NULL	
+  owner_name	VARCHAR(50)	NOT NULL                                          [신고자]
+  owner_contact	VARCHAR(20)	NOT NULL	                                      [신고자 연락처]
+  status_id	INT	NOT NULL, FK → report_status	처리 상태 FK from report_status
+  processed_date	DATE	NULL	                                              [처리일]
+  checker_id	INT	NULL, FK → app_user	
+  matched_found_id	BIGINT	NULL, FK → found_item	                          [매칭된 분실물]
+  image_path	VARCHAR(255)	NULL	
+  created_at	DATETIME	NOT NULL	
+  updated_at	DATETIME	NOT NULL	id	BIGINT	PK, AUTO_INCREMENT	
+  manage_no	VARCHAR(20)	NOT NULL, UNIQUE                                    [20261001 형식]
+  received_date	DATE	NOT NULL	                                            [접수일]
+  found_date	DATE	NOT NULL                                                [습득일]
+  category_id	INT	NOT NULL, FK → item_category	FK from item_category
+  item_name	VARCHAR(100)	NOT NULL	
+  feature	VARCHAR(500)	NULL	
+  owner_name	VARCHAR(50)	NOT NULL	                                        [신고자]
+  owner_contact	VARCHAR(20)	NOT NULL	                                      [신고자 연락처]
+  status_id	INT	NOT NULL, FK → report_status	처리 상태 FK from report_status
+  processed_date	DATE	NULL	                                              [처리일]
+  checker_id	INT	NULL, FK → app_user	
+  matched_found_id	BIGINT	NULL, FK → found_item	                          [매칭된 분실물]
+  image_path	VARCHAR(255)	NULL	
+  created_at	DATETIME	NOT NULL	
+  updated_at	DATETIME	NOT NULL	
+}
 
 ### 설정값을 다루는 3가지 규칙
 
