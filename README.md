@@ -20,7 +20,7 @@ npm run lint    # 문법 검사
 | 경로 | 화면 |
 | --- | --- |
 | `/login` | 로그인 |
-| `/` | 목록 (분실물관리대장 · 분실신고 관리대장 탭) |
+| `/` | 목록 (분실물관리대장 · 분실신고 관리대장 탭, 한 쪽 10건씩) |
 | `/settings` | 설정값 변경 (물품구분 · 처리결과) |
 | `/found/new`, `/found/:관리번호`, `/found/:관리번호/edit` | 분실물 접수 · 상세 · 수정 |
 | `/lost/new`, `/lost/:관리번호`, `/lost/:관리번호/edit` | 분실 신고 접수 · 상세 · 수정 |
@@ -38,14 +38,14 @@ process_result (처리결과)
 
 found_item (유실물)
   manageNo(관리번호), receivedDate, foundDate, itemName, feature,
-  owner, ownerContact, contacted, storagePlace, checker, image,
+  lostPlace(분실 장소), owner, ownerContact, contacted, storagePlace, checker, image,
   category_id  → item_category.id 참조
   result_id    → process_result.id 참조
   deadline     ← 등록 시점에 계산해 저장 (설정 변경과 무관)
 
 lost_report (분실신고)   ※ 사진은 붙이지 않는다
   manageNo, receivedDate, foundDate, itemName, feature,
-  owner, ownerContact, status, processedDate, checker,
+  lostPlace(분실 장소), owner, ownerContact, status, processedDate, checker,
   category_id  → item_category.id 참조
 ```
 
@@ -63,6 +63,21 @@ lost_report (분실신고)   ※ 사진은 붙이지 않는다
    `deadline`(보관기한) 은 등록할 때 계산해 레코드에 저장하므로,
    나중에 보관기간 설정이 바뀌어도 기존 건의 기한은 그대로 유지된다.
 
+## 디자인
+
+화면 디자인은 `유실물관리프로그램 ui.pdf` 시안(1440px 기준)을 따른다.
+색과 굵기는 `src/index.css` 맨 위 변수에 모여 있다.
+
+| 구분 | 값 | 쓰는 곳 |
+| --- | --- | --- |
+| 메인 컬러 | `#006EAA` | 버튼, 활성 탭, 강조 글자 |
+| 메인 컬러 | `#F7F8FB` | 페이지 배경, 표 머리글, 자동 계산 칸 |
+| 서브 컬러(회색) | `#E3E7ED` | 테두리, 구분선, 비활성 탭 건수 |
+| 서브 블루 | `#E3ECF7` | 관리번호 상자 |
+
+글꼴은 Pretendard 이며 npm 패키지로 들여와 인터넷 없이도 나온다.
+제목·소제목(화면 제목, 로그인 제목, 카드 제목, 필터 묶음 제목)은 SemiBold(600), 나머지 본문은 Medium(500) 이다.
+
 ## 폴더 구성
 
 ```
@@ -74,8 +89,12 @@ src/
   imageUtil.js       사진 축소 · 전화번호 형식 변환
   auth.js            로그인 상태 저장
   useStickyState.js  화면을 옮겨도 유지되는 useState
-  useRecordForm.js   접수 · 신고 폼 공통 처리
-  components/        PageHeader · ManageNoBar · Field · PhotoCell · NotFoundBox
-                     (여러 화면이 함께 쓰는 조각)
-  pages/             화면별 컴포넌트
+  useRecordForm.js   상세 · 접수 · 수정 화면의 폼 공통 처리
+  formContext.js     한 화면의 입력칸들이 폼 상태를 함께 쓰는 통로
+  components/        여러 화면이 함께 쓰는 조각
+                     PageHeader(큰 제목) · ManageNoBadge(관리번호 상자) · Section(흰 카드)
+                     Field(항목 이름 + 입력칸, 상세 화면에선 값만) · PhotoCard(사진)
+                     ActionBar(아래 버튼 줄) · Pagination(쪽번호) · icons · NotFoundBox
+  pages/             LoginPage · ListPage · SettingsPage
+                     FoundItemPage(분실물 상세·접수·수정) · LostReportPage(분실신고 상세·신고·수정)
 ```

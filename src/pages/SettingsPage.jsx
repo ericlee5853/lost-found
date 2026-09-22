@@ -25,12 +25,12 @@ export default function SettingsPage() {
   const results = processResultTable.all();
 
   return (
-    <div className="page narrow">
+    <div className="page form-page">
       <PageHeader title="설정값 변경">
         <button className="btn" onClick={() => navigate("/")}>목록으로</button>
       </PageHeader>
 
-      <p className="settings-note">
+      <p className="card settings-note">
         이름을 바꾸면 이미 등록된 데이터의 표시 이름도 함께 바뀝니다.
         사용중지한 항목은 새로 등록할 때 선택 목록에 나오지 않지만, 과거 데이터에는 그대로 남습니다.
         보관기간을 바꿔도 이미 등록된 건의 보관기한은 등록 시점 값 그대로 유지됩니다.
@@ -189,9 +189,9 @@ function SettingTable({ title, table, rows, columns, newRowTemplate, countUses, 
   }
 
   return (
-    <section className="settings-section">
-      <h2 className="settings-title">{title}</h2>
-      <table className="grid settings-grid">
+    <section className="card settings-section">
+      <h2 className="card-title">{title}</h2>
+      <table className="data-table settings-table">
         <thead>
           <tr>
             <th style={{ width: 60 }}>ID</th>
@@ -203,36 +203,40 @@ function SettingTable({ title, table, rows, columns, newRowTemplate, countUses, 
         <tbody>
           {rows.map((row) => (
             <tr key={row.id} className={row.is_active ? "" : "row-inactive"}>
-              <td className="cell">{row.id}</td>
+              <td>{row.id}</td>
               {columns.map((c) => (
-                <td className="cell" key={c.key}>
+                <td key={c.key}>
                   <CellInput column={c} value={valueOf(row, c.key)}
                     onChange={(v) => editDraft(row, c.key, v)} />
                 </td>
               ))}
-              <td className="cell">{row.is_active ? "사용중" : "사용중지"}</td>
-              <td className="cell settings-actions">
-                <button className="btn small primary" onClick={() => saveRow(row)}>저장</button>
-                <button className="btn small" onClick={() => toggleActive(row)}>
-                  {row.is_active ? "사용중지" : "사용재개"}
-                </button>
-                <button className="btn small danger" onClick={() => removeRow(row)}>삭제</button>
+              <td>{row.is_active ? "사용중" : "사용중지"}</td>
+              <td>
+                <div className="settings-actions">
+                  <button className="btn small primary" onClick={() => saveRow(row)}>저장</button>
+                  <button className="btn small" onClick={() => toggleActive(row)}>
+                    {row.is_active ? "사용중지" : "사용재개"}
+                  </button>
+                  <button className="btn small danger" onClick={() => removeRow(row)}>삭제</button>
+                </div>
               </td>
             </tr>
           ))}
 
           {/* 새 항목 추가 줄 */}
           <tr className="row-new">
-            <td className="cell">새 항목</td>
+            <td>새 항목</td>
             {columns.map((c) => (
-              <td className="cell" key={c.key}>
+              <td key={c.key}>
                 <CellInput column={c} value={newRow[c.key]}
                   onChange={(v) => setNewRow((prev) => ({ ...prev, [c.key]: v }))} />
               </td>
             ))}
-            <td className="cell">-</td>
-            <td className="cell settings-actions">
-              <button className="btn small primary" onClick={addRow}>추가</button>
+            <td>-</td>
+            <td>
+              <div className="settings-actions">
+                <button className="btn small primary" onClick={addRow}>추가</button>
+              </div>
             </td>
           </tr>
         </tbody>

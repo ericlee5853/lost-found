@@ -15,16 +15,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-box">
-      <h1>유실물 관리 프로그램</h1>
-      <form onSubmit={handleSubmit}>
-        <input className="input login-input" type="text" placeholder="아이디"
-          value={id} onChange={(e) => setId(e.target.value)} />
-        <input className="input login-input" type="password" placeholder="비밀번호"
-          value={pw} onChange={(e) => setPw(e.target.value)} />
-        <button type="submit" className="btn primary login-btn">로그인</button>
+    <div className="login-page">
+      <form className="login-box" onSubmit={handleSubmit}>
+        <h1 className="login-title">유실물 관리 프로그램</h1>
+        {/* 아이디·비밀번호 두 칸을 한 상자로 묶는다 */}
+        <div className="login-fields">
+          <input className="login-input" type="text" placeholder="아이디" autoComplete="username"
+            value={id} onChange={(e) => setId(e.target.value)} />
+          <input className="login-input" type="password" placeholder="비밀번호" autoComplete="current-password"
+            value={pw} onChange={(e) => setPw(e.target.value)} />
+        </div>
+        <button type="submit" className="login-btn">로그인</button>
+        {error && <p className="form-error">{error}</p>}
       </form>
-      {error && <p className="form-error">{error}</p>}
     </div>
   );
 }
