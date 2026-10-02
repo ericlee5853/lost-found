@@ -1,36 +1,35 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
-import { logout } from "../auth";
-import { getFoundItems, getLostReports } from "../storage";
-import {
-  itemCategoryTable, processResultTable,
-  getCategoryName, getResultName, getDefaultResultId,
-} from "../settings";
-import { PROCESS_STATUSES, CONTACTED_OPTIONS, toOptions } from "../constants";
+import { logout } from "../api/auth";
+import { imageUrl } from "../api/client";
+import { foundItemApi, lostReportApi } from "../api/records";
+import { useReference, nameOf, filterOptions } from "../referenceContext";
+import { useAsync } from "../useAsync";
+import { CONTACTED_OPTIONS, toOptions } from "../constants";
 import { today } from "../dateUtil";
 import { useStickyState } from "../useStickyState";
 import PageHeader from "../components/PageHeader";
 import Pagination from "../components/Pagination";
+import { LoadingBox, ErrorBox } from "../components/StatusBox";
 import { SearchIcon, PlusIcon, FilterIcon } from "../components/icons";
 
 const PAGE_SIZE = 10; // 한 쪽에 보여줄 건수
 
-// 엑셀 내보내기 컬럼: [레코드의 키, 엑셀 머리글]
-// 화면 표보다 항목이 많다(대장 전체를 내보내기 위함).
-// 이름이 필요한 항목은 화면용으로 미리 풀어 둔 categoryName/resultName 을 쓴다.
+// 엑셀 내보내기 컬럼: [내보낼 값의 키, 엑셀 머리글]
+// id 로 저장된 항목은 미리 이름으로 풀어 둔 값(categoryName 등)을 쓴다.
 const FOUND_EXPORT = [
   ["manageNo", "관리번호"], ["receivedDate", "접수일"], ["foundDate", "습득일"],
   ["categoryName", "물품 구분"], ["itemName", "물품명"], ["feature", "특징"],
-  ["lostPlace", "분실 장소"], ["owner", "소유자"], ["ownerContact", "소유자 연락처"],
-  ["contacted", "연락여부"], ["storagePlace", "보관장소"], ["deadline", "보관기한"],
-  ["resultName", "처리결과"], ["checker", "확인자"],
+  ["lostPlace", "분실 장소"], ["owner", "소유자"], ["ownerContact", "소유자 연락처"], ["contacted", "연락여부"],
+  ["storagePlace", "보관장소"], ["deadline", "보관기한"], ["resultName", "처리결과"],
+  ["processedDate", "처리일"], ["checkerName", "확인자"],
 ];
 const LOST_EXPORT = [
   ["manageNo", "관리번호"], ["receivedDate", "접수일"], ["foundDate", "습득일"],
   ["categoryName", "물품 구분"], ["itemName", "물품명"], ["feature", "특징"],
   ["lostPlace", "분실 장소"], ["owner", "소유자"], ["ownerContact", "소유자 연락처"],
-  ["status", "처리 상태"], ["processedDate", "처리일"], ["checker", "확인자"],
+  ["statusName", "처리 상태"], ["processedDate", "처리일"], ["checkerName", "확인자"],
 ];
 
 // 화면 표의 컬럼: 머리글과 너비(%). 디자인 시안의 칸 비율을 따른다.
@@ -42,16 +41,6 @@ const LOST_COLUMNS = [
   ["관리번호", 11.4], ["물품구분", 10.7], ["물품명", 9.6], ["소유자", 10.3],
   ["소유자 연락처", 12.4], ["접수일", 13.5], ["습득일", 12.3], ["처리상태", 10.5], ["확인자", 9.3],
 ];
-
-/**
- * 설정 테이블을 필터 체크박스 옵션으로 바꾼다.
- * 사용중지된 항목도 과거 데이터 검색을 위해 남겨 두되 표시로 구분한다.
- */
-const settingOptions = (table) =>
-  table.all().map((row) => ({
-    value: row.id,
-    label: row.is_active ? row.name : `${row.name} (사용중지)`,
-  }));
 
 /** 값이 비어 있으면 "-" */
 const orDash = (v) => v || "-";
@@ -91,19 +80,28 @@ function EmptyRow({ colSpan }) {
   return <tr><td colSpan={colSpan} className="empty-cell">표시할 데이터가 없습니다.</td></tr>;
 }
 
+/** 두 대장을 한 번에 받아온다. 최신 등록 건이 위로 오도록 정렬한다. */
+async function loadLedgers() {
+  const [found, lost] = await Promise.all([foundItemApi.list(), lostReportApi.list()]);
+  const newestFirst = (a, b) => (b.id ?? 0) - (a.id ?? 0);
+  return { found: found.sort(newestFirst), lost: lost.sort(newestFirst) };
+}
+
 export default function ListPage() {
   const navigate = useNavigate();
+  const { categories, results, statuses, users } = useReference();
+  const { data, loading, error, reload } = useAsync(loadLedgers, []);
+
   const [tab, setTab] = useStickyState("lf_tab", "found");
   const [keyword, setKeyword] = useStickyState("lf_keyword", "");
   const [filterOpen, setFilterOpen] = useState(false); // 패널 열림 상태는 유지하지 않음
 
-  // 필터 상태 (페이지를 옮겨도 유지). 물품구분·처리결과는 id 로 저장한다.
-  const [catFilter, setCatFilter] = useStickyState("lf_catFilter_v2", []);
+  // 필터 상태 (페이지를 옮겨도 유지). 물품구분·처리결과·처리상태는 서버의 id 로 저장한다.
+  const [catFilter, setCatFilter] = useStickyState("lf_catFilter_v3", []);
   const [contactedFilter, setContactedFilter] = useStickyState("lf_contactedFilter", []);
-  const [resultFilter, setResultFilter] = useStickyState("lf_resultFilter_v2",
-    [getDefaultResultId()].filter((id) => id != null));
+  const [resultFilter, setResultFilter] = useStickyState("lf_resultFilter_v3", []);
   const [expiredOnly, setExpiredOnly] = useStickyState("lf_expiredOnly", false);
-  const [statusFilter, setStatusFilter] = useStickyState("lf_statusFilter", []);
+  const [statusFilter, setStatusFilter] = useStickyState("lf_statusFilter_v3", []);
 
   /** 체크박스 토글 함수를 만든다 (선택돼 있으면 빼고, 아니면 넣는다) */
   function toggle(setter) {
@@ -117,73 +115,63 @@ export default function ListPage() {
     setExpiredOnly(false); setStatusFilter([]);
   }
 
+  const isFound = tab === "found";
+
   // 필터 버튼에 표시할 "적용 중인 필터 개수"
   const activeCount =
     (catFilter.length ? 1 : 0) +
-    (tab === "found" && contactedFilter.length ? 1 : 0) +
-    (tab === "found" && resultFilter.length ? 1 : 0) +
-    (tab === "found" && expiredOnly ? 1 : 0) +
-    (tab === "lost" && statusFilter.length ? 1 : 0);
+    (isFound && contactedFilter.length ? 1 : 0) +
+    (isFound && resultFilter.length ? 1 : 0) +
+    (isFound && expiredOnly ? 1 : 0) +
+    (!isFound && statusFilter.length ? 1 : 0);
 
   /** 검색어가 레코드의 주요 항목 중 하나에라도 들어 있는지 */
   function matchKeyword(it) {
     if (!keyword.trim()) return true;
     const k = keyword.trim().toLowerCase();
     const hay = [
-      it.manageNo, it.itemName, it.feature, it.owner, it.ownerContact,
-      it.lostPlace, it.storagePlace, it.checker, it.categoryName, it.resultName,
+      it.manageNo, it.itemName, it.feature, it.lostPlace, it.owner, it.ownerContact,
+      it.storagePlace, it.categoryName, it.resultName, it.statusName, it.checkerName,
     ].filter(Boolean).join(" ").toLowerCase();
     return hay.includes(k);
   }
   function matchFound(it) {
-    if (catFilter.length && !catFilter.includes(it.category_id)) return false;
+    if (catFilter.length && !catFilter.includes(it.categoryId)) return false;
     if (contactedFilter.length && !contactedFilter.includes(it.contacted)) return false;
-    if (resultFilter.length && !resultFilter.includes(it.result_id)) return false;
+    if (resultFilter.length && !resultFilter.includes(it.resultId)) return false;
     if (expiredOnly && !(it.deadline && it.deadline < today())) return false;
     return matchKeyword(it);
   }
   function matchLost(it) {
-    if (catFilter.length && !catFilter.includes(it.category_id)) return false;
-    if (statusFilter.length && !statusFilter.includes(it.status)) return false;
+    if (catFilter.length && !catFilter.includes(it.categoryId)) return false;
+    if (statusFilter.length && !statusFilter.includes(it.statusId)) return false;
     return matchKeyword(it);
   }
 
-  // 저장된 id 를 화면에 보여줄 이름으로 풀어 둔다(규칙 1: 이름은 항상 설정에서 가져온다).
-  const allFound = getFoundItems().map((it) => {
-    const resultId = it.result_id ?? getDefaultResultId();
-    return {
-      ...it,
-      categoryName: getCategoryName(it.category_id),
-      result_id: resultId,
-      resultName: getResultName(resultId),
-    };
-  });
-  const allLost = getLostReports().map((it) => ({
-    ...it,
-    categoryName: getCategoryName(it.category_id),
-  }));
-
-  const isFound = tab === "found";
-  const current = isFound ? allFound.filter(matchFound) : allLost.filter(matchLost);
-
-  // 쪽 나누기. 탭·검색어·필터가 바뀌면 1쪽으로 돌아간다.
-  // (조건을 key 로 같이 저장해 두고, key 가 다르면 1쪽으로 본다.)
-  const pageKey = JSON.stringify([tab, keyword, catFilter, contactedFilter,
-    resultFilter, expiredOnly, statusFilter]);
-  const [pageState, setPageState] = useStickyState("lf_page", { key: "", page: 1 });
-  const totalPages = Math.max(1, Math.ceil(current.length / PAGE_SIZE));
-  const page = Math.min(pageState.key === pageKey ? pageState.page : 1, totalPages);
-  const pageItems = current.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
   function handleLogout() {
     logout();
-    navigate("/login");
+    navigate("/login", { replace: true });
   }
 
   function changeTab(next) {
     setTab(next);
     setFilterOpen(false);
   }
+
+  if (loading) return <LoadingBox message="대장을 불러오는 중입니다..." />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+
+  // 서버는 id 만 주므로, 화면에 쓸 이름을 설정·사용자 목록에서 찾아 붙여 둔다.
+  const withNames = (it, extra) => ({
+    ...it,
+    categoryName: nameOf(categories, it.categoryId),
+    checkerName: nameOf(users, it.checkerId),
+    ...extra,
+  });
+  const allFound = data.found.map((it) => withNames(it, { resultName: nameOf(results, it.resultId) }));
+  const allLost = data.lost.map((it) => withNames(it, { statusName: nameOf(statuses, it.statusId) }));
+
+  const current = isFound ? allFound.filter(matchFound) : allLost.filter(matchLost);
 
   /** 현재 탭에서 검색·필터로 걸러진 목록 전체를 엑셀 파일로 내려받는다. */
   function exportExcel() {
@@ -218,18 +206,59 @@ export default function ListPage() {
         </button>
       </div>
 
+      <ListBody
+        isFound={isFound}
+        rows={current}
+        keyword={keyword}
+        onKeyword={setKeyword}
+        activeCount={activeCount}
+        filterOpen={filterOpen}
+        setFilterOpen={setFilterOpen}
+        onAdd={() => navigate(isFound ? "/found/new" : "/lost/new")}
+        onOpen={(no) => navigate(isFound ? `/found/${no}` : `/lost/${no}`)}
+        filters={{
+          categories, results, statuses,
+          catFilter, setCatFilter, contactedFilter, setContactedFilter,
+          resultFilter, setResultFilter, expiredOnly, setExpiredOnly,
+          statusFilter, setStatusFilter, toggle, resetFilters,
+        }}
+      />
+    </div>
+  );
+}
+
+/** 탭 아래 흰 판: 검색 · 건수 · 표 · 쪽번호 */
+function ListBody({ isFound, rows, keyword, onKeyword, activeCount, filterOpen, setFilterOpen, onAdd, onOpen, filters }) {
+  const {
+    categories, results, statuses,
+    catFilter, setCatFilter, contactedFilter, setContactedFilter,
+    resultFilter, setResultFilter, expiredOnly, setExpiredOnly,
+    statusFilter, setStatusFilter, toggle, resetFilters,
+  } = filters;
+
+  // 쪽 나누기. 탭·검색어·필터가 바뀌면 1쪽으로 돌아간다.
+  // (조건을 key 로 같이 저장해 두고, key 가 다르면 1쪽으로 본다.)
+  const pageKey = JSON.stringify([isFound, keyword, catFilter, contactedFilter,
+    resultFilter, expiredOnly, statusFilter]);
+  const [pageState, setPageState] = useStickyState("lf_page", { key: "", page: 1 });
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const page = Math.min(pageState.key === pageKey ? pageState.page : 1, totalPages);
+  const pageItems = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const columns = isFound ? FOUND_COLUMNS : LOST_COLUMNS;
+
+  return (
+    <>
       <div className="list-panel">
         {/* 검색 · 등록 · 필터 */}
         <div className="list-toolbar">
           <label className="search-box">
             <input className="search-input" value={keyword}
               placeholder="관리번호, 물품명, 특징, 소유자명 등 검색해보세요."
-              onChange={(e) => setKeyword(e.target.value)} />
+              onChange={(e) => onKeyword(e.target.value)} />
             <SearchIcon />
           </label>
 
-          <button className="btn primary toolbar-btn"
-            onClick={() => navigate(isFound ? "/found/new" : "/lost/new")}>
+          <button className="btn primary toolbar-btn" onClick={onAdd}>
             <PlusIcon /> 유실물 등록
           </button>
 
@@ -242,13 +271,13 @@ export default function ListPage() {
               <>
                 <div className="filter-backdrop" onClick={() => setFilterOpen(false)} />
                 <div className="filter-panel">
-                  <CheckGroup title="물품 구분" options={settingOptions(itemCategoryTable)}
+                  <CheckGroup title="물품 구분" options={filterOptions(categories)}
                     selected={catFilter} onToggle={toggle(setCatFilter)} />
                   {isFound && (
                     <>
                       <CheckGroup title="연락여부" options={toOptions(CONTACTED_OPTIONS)}
                         selected={contactedFilter} onToggle={toggle(setContactedFilter)} />
-                      <CheckGroup title="처리결과" options={settingOptions(processResultTable)}
+                      <CheckGroup title="처리결과" options={filterOptions(results)}
                         selected={resultFilter} onToggle={toggle(setResultFilter)} />
                       <div className="filter-group">
                         <div className="filter-group-title">보관기한</div>
@@ -261,7 +290,7 @@ export default function ListPage() {
                     </>
                   )}
                   {!isFound && (
-                    <CheckGroup title="처리 상태" options={toOptions(PROCESS_STATUSES)}
+                    <CheckGroup title="처리 상태" options={filterOptions(statuses)}
                       selected={statusFilter} onToggle={toggle(setStatusFilter)} />
                   )}
                   <div className="filter-panel-actions">
@@ -275,64 +304,62 @@ export default function ListPage() {
         </div>
 
         {/* 건수: 검색·필터 뒤 남은 건수. 대장 전체 건수는 탭 옆 숫자로 보인다. */}
-        <p className="list-count">전체 <b>{current.length}건</b></p>
+        <p className="list-count">전체 <b>{rows.length}건</b></p>
 
-        {/* 분실물관리대장 */}
-        {isFound && (
-          <table className="data-table">
-            <TableHead columns={FOUND_COLUMNS} />
-            <tbody>
-              {pageItems.length === 0 && <EmptyRow colSpan={FOUND_COLUMNS.length} />}
-              {pageItems.map((it) => (
-                <tr key={it.manageNo} className="clickable"
-                  onClick={() => navigate(`/found/${it.manageNo}`)}>
-                  <td>{it.manageNo}</td>
-                  <td>
-                    <div className="thumb">{it.image && <img src={it.image} alt="" />}</div>
-                  </td>
-                  {/* 물품명 아래에 분실 장소를 작게 적는다 */}
-                  <td className="cell-left">
-                    <div className="item-name">{orDash(it.itemName)}</div>
-                    {it.lostPlace && <div className="item-sub">{it.lostPlace}</div>}
-                  </td>
-                  <td>{orDash(it.categoryName)}</td>
-                  <td>{orDash(it.receivedDate)}</td>
-                  <td>{orDash(it.foundDate)}</td>
-                  <td>{orDash(it.resultName)}</td>
-                  <td>{orDash(it.checker)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {/* 분실신고 관리대장 */}
-        {!isFound && (
-          <table className="data-table">
-            <TableHead columns={LOST_COLUMNS} />
-            <tbody>
-              {pageItems.length === 0 && <EmptyRow colSpan={LOST_COLUMNS.length} />}
-              {pageItems.map((it) => (
-                <tr key={it.manageNo} className="clickable"
-                  onClick={() => navigate(`/lost/${it.manageNo}`)}>
-                  <td>{it.manageNo}</td>
-                  <td>{orDash(it.categoryName)}</td>
-                  <td>{orDash(it.itemName)}</td>
-                  <td>{orDash(it.owner)}</td>
-                  <td>{orDash(it.ownerContact)}</td>
-                  <td>{orDash(it.receivedDate)}</td>
-                  <td>{orDash(it.foundDate)}</td>
-                  <td>{orDash(it.status)}</td>
-                  <td>{orDash(it.checker)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <table className="data-table">
+          <TableHead columns={columns} />
+          <tbody>
+            {pageItems.length === 0 && <EmptyRow colSpan={columns.length} />}
+            {pageItems.map((it) => (isFound
+              ? <FoundRow key={it.manageNo} it={it} onOpen={onOpen} />
+              : <LostRow key={it.manageNo} it={it} onOpen={onOpen} />))}
+          </tbody>
+        </table>
       </div>
 
       <Pagination page={page} totalPages={totalPages}
         onChange={(p) => setPageState({ key: pageKey, page: p })} />
-    </div>
+    </>
+  );
+}
+
+/** 분실물관리대장 한 줄 */
+function FoundRow({ it, onOpen }) {
+  return (
+    <tr className="clickable" onClick={() => onOpen(it.manageNo)}>
+      <td>{it.manageNo}</td>
+      <td>
+        <div className="thumb">
+          {it.imagePath && <img src={imageUrl(it.imagePath)} alt="" />}
+        </div>
+      </td>
+      {/* 물품명 아래에 분실 장소를 작게 적는다 */}
+      <td className="cell-left">
+        <div className="item-name">{orDash(it.itemName)}</div>
+        {it.lostPlace && <div className="item-sub">{it.lostPlace}</div>}
+      </td>
+      <td>{orDash(it.categoryName)}</td>
+      <td>{orDash(it.receivedDate)}</td>
+      <td>{orDash(it.foundDate)}</td>
+      <td>{orDash(it.resultName)}</td>
+      <td>{orDash(it.checkerName)}</td>
+    </tr>
+  );
+}
+
+/** 분실신고 관리대장 한 줄 */
+function LostRow({ it, onOpen }) {
+  return (
+    <tr className="clickable" onClick={() => onOpen(it.manageNo)}>
+      <td>{it.manageNo}</td>
+      <td>{orDash(it.categoryName)}</td>
+      <td>{orDash(it.itemName)}</td>
+      <td>{orDash(it.owner)}</td>
+      <td>{orDash(it.ownerContact)}</td>
+      <td>{orDash(it.receivedDate)}</td>
+      <td>{orDash(it.foundDate)}</td>
+      <td>{orDash(it.statusName)}</td>
+      <td>{orDash(it.checkerName)}</td>
+    </tr>
   );
 }

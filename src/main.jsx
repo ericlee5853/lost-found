@@ -8,7 +8,8 @@ import "./index.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
+    {/* 서버의 /founder/ 아래에 올리므로 그 경로를 기준으로 화면을 옮긴다 */}
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <App />
     </BrowserRouter>
   </StrictMode>

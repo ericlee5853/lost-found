@@ -1,8 +1,7 @@
 // src/dateUtil.js
 // 날짜 문자열("YYYY-MM-DD") 관련 공통 함수.
-// 여러 페이지에 흩어져 있던 today() 중복 정의를 이 파일 하나로 모았다.
 
-/** Date 객체 → "YYYY-MM-DD" 문자열 (로컬 시간 기준, UTC 변환으로 인한 하루 밀림 방지) */
+/** Date 객체 → "YYYY-MM-DD" (로컬 시간 기준, UTC 변환으로 인한 하루 밀림 방지) */
 function toDateString(date) {
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
@@ -15,15 +14,20 @@ export function today() {
 }
 
 /**
- * 날짜 문자열에 개월 수를 더한다. ("2025-01-31" + 1개월 → 2025-03-03 처럼
- * 월말 넘김은 JS Date 가 자동으로 정규화한다.)
- * @param {string} dateStr "YYYY-MM-DD"
- * @param {number} months  더할 개월 수
- * @returns {string} 계산된 날짜, 입력이 비었으면 빈 문자열
+ * 보관기한 미리보기: 습득일 + 물품구분의 보관개월.
+ * 실제 저장값은 서버가 같은 규칙(습득일 기준)으로 계산해 내려 주며,
+ * 여기서는 등록·수정 화면에 미리 보여 주기만 한다.
+ * @param {string} foundDate "YYYY-MM-DD" 습득일
+ * @param {number} months    보관개월. 0 이하면 기한 없음
  */
-export function addMonths(dateStr, months) {
-  if (!dateStr || !Number.isFinite(months)) return "";
-  const [y, m, d] = dateStr.split("-").map(Number);
+export function previewDeadline(foundDate, months) {
+  if (!foundDate || !Number.isFinite(months) || months <= 0) return "";
+  const [y, m, d] = foundDate.split("-").map(Number);
   if (!y || !m || !d) return "";
-  return toDateString(new Date(y, m - 1 + months, d));
+  // 더한 달에 그 날짜가 없으면 그 달 마지막 날로 맞춘다(서버와 같은 규칙).
+  // 예: 2026-01-31 + 1개월 → 2026-02-28
+  const target = new Date(y, m - 1 + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d, lastDay));
+  return toDateString(target);
 }

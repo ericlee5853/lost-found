@@ -1,14 +1,14 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  addFoundItem, getFoundItem, updateFoundItem, deleteFoundItem, peekFoundManageNo,
-} from "../storage";
-import {
-  itemCategoryTable, processResultTable, selectOptions,
-  computeDeadline, getDefaultResultId, getExpireAction,
-} from "../settings";
-import { STAFF_NAMES, CONTACTED_OPTIONS, DEFAULT_STORAGE_PLACE, toOptions } from "../constants";
-import { formatPhone } from "../imageUtil";
-import { today } from "../dateUtil";
+import { foundItemApi } from "../api/records";
+import { toMessage, imageUrl } from "../api/client";
+import { uploadImage } from "../api/uploads";
+import { checkImageFile, shrinkImage } from "../imageFile";
+import { useReference, selectOptions } from "../referenceContext";
+import { useAsync } from "../useAsync";
+import { CONTACTED_OPTIONS, DEFAULT_STORAGE_PLACE, toOptions } from "../constants";
+import { formatPhone } from "../formatUtil";
+import { today, previewDeadline } from "../dateUtil";
 import { useRecordForm } from "../useRecordForm";
 import { RecordFormContext } from "../formContext";
 import PageHeader from "../components/PageHeader";
@@ -17,24 +17,26 @@ import PhotoCard from "../components/PhotoCard";
 import Section from "../components/Section";
 import Field from "../components/Field";
 import ActionBar from "../components/ActionBar";
-import NotFoundBox from "../components/NotFoundBox";
+import { LoadingBox, ErrorBox } from "../components/StatusBox";
 
-/** 새 접수 화면의 초기값. 물품구분·처리결과는 이름이 아니라 id 로 담는다. */
-function emptyForm() {
+/** 새 접수 화면의 초기값. 물품구분·처리결과·확인자는 이름이 아니라 서버의 id 로 담는다. */
+function emptyForm(manageNo, defaultResultId, meId) {
   return {
-    receivedDate: today(), foundDate: today(), category_id: "", itemName: "",
+    manageNo,
+    receivedDate: today(), foundDate: today(), categoryId: "", itemName: "",
     feature: "", lostPlace: "", storagePlace: DEFAULT_STORAGE_PLACE,
     owner: "", ownerContact: "", contacted: CONTACTED_OPTIONS[0],
-    result_id: getDefaultResultId(), checker: "", image: "",
+    resultId: defaultResultId, processedDate: "", checkerId: meId, imagePath: "",
   };
 }
 
-/** 필수 입력 항목과 안내 문구 */
+/** 필수 입력 항목과 안내 문구 (서버가 요구하는 항목과 같다) */
 const REQUIRED_FIELDS = [
-  ["category_id", "물품 구분을 선택하세요."],
+  ["categoryId", "물품 구분을 선택하세요."],
   ["itemName", "물품명을 입력하세요."],
   ["receivedDate", "접수일을 입력하세요."],
   ["foundDate", "습득일을 입력하세요."],
+  ["resultId", "처리결과를 선택하세요."],
 ];
 
 /**
@@ -46,46 +48,104 @@ export default function FoundItemPage({ mode }) {
   const navigate = useNavigate();
   const { manageNo } = useParams();
   const isNew = !manageNo;
+
+  // 기존 건이면 서버에서 한 건을 받아오고, 새 건이면 다음 관리번호를 받아온다.
+  const { data, loading, error, reload } = useAsync(
+    () => (isNew ? foundItemApi.nextManageNo() : foundItemApi.get(manageNo)),
+    [manageNo]
+  );
+
+  if (loading) return <LoadingBox />;
+  if (error) {
+    return (
+      <ErrorBox message={error} onRetry={reload}>
+        <button className="btn" onClick={() => navigate("/")}>목록으로</button>
+      </ErrorBox>
+    );
+  }
+
+  return <FoundItemForm mode={mode} manageNo={manageNo} saved={isNew ? null : data}
+    newManageNo={isNew ? data : ""} />;
+}
+
+function FoundItemForm({ mode, manageNo, saved, newManageNo }) {
+  const navigate = useNavigate();
+  const { categories, results, users, me } = useReference();
+  const [sending, setSending] = useState(false);
+  const [photo, setPhoto] = useState({ uploading: false, message: "" });
+
+  const isNew = !saved;
   const readOnly = mode === "view";
-  const saved = isNew ? null : getFoundItem(manageNo);
+  const defaultResultId = results.find((r) => r.is_active)?.id ?? "";
 
-  const recordForm = useRecordForm(() => saved ?? emptyForm());
-  const { form, error, handleImage, removeImage, checkRequired } = recordForm;
+  const recordForm = useRecordForm(() =>
+    saved ?? emptyForm(newManageNo, defaultResultId, me?.id ?? ""));
+  const { form, error, setError, checkRequired } = recordForm;
 
-  // 보관기한은 계산 시점에 확정해 레코드에 저장한다(규칙 3).
-  // 수정 화면에서는 접수일·물품구분이 실제로 바뀌었을 때만 다시 계산하고,
-  // 그렇지 않으면 저장돼 있던 기한을 그대로 둔다.
-  // (그래서 보관기간 설정을 바꿔도 기존 건의 기한은 변하지 않는다.)
-  const deadlineInputsKept = saved
-    && saved.receivedDate === form.receivedDate
-    && Number(saved.category_id) === Number(form.category_id);
-  const deadline = deadlineInputsKept
+  // 보관기한은 서버가 습득일 + 물품구분의 보관개월로 계산해 저장한다.
+  // 저장 전에는 같은 규칙으로 미리 계산해 보여 주고, 저장된 건은 서버 값을 그대로 쓴다.
+  const category = categories.find((c) => c.id === Number(form.categoryId));
+  const deadline = saved && saved.categoryId === form.categoryId && saved.foundDate === form.foundDate
     ? saved.deadline
-    : computeDeadline(form.receivedDate, form.category_id);
+    : previewDeadline(form.foundDate, Number(category?.storage_months));
 
-  // 기간 만료 시 조치 방법은 지금의 설정값을 보여 준다(앞으로 취할 조치이므로).
-  const expireAction = getExpireAction(form.category_id);
+  /**
+   * 고른 사진을 올리고 그 경로를 폼에 담는다.
+   * 올리기 전에 크기를 줄여 전송량을 아끼고, 브라우저가 열지 못하는 형식이면
+   * (예: 크롬에서 아이폰 HEIC) 원본을 그대로 올린다.
+   */
+  async function handlePickPhoto(file) {
+    const problem = checkImageFile(file);
+    if (problem) return setPhoto({ uploading: false, message: problem });
 
-  if (!isNew && !saved) return <NotFoundBox manageNo={manageNo} />;
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    if (!checkRequired(REQUIRED_FIELDS)) return;
-
-    const data = { ...form, category_id: Number(form.category_id), deadline };
-    if (isNew) {
-      addFoundItem(data);
-      navigate("/", { replace: true });
-    } else {
-      updateFoundItem(manageNo, data);
-      navigate(`/found/${manageNo}`, { replace: true });
+    setPhoto({ uploading: true, message: "" });
+    try {
+      const shrunk = await shrinkImage(file);
+      const imagePath = await uploadImage(shrunk ?? file);
+      recordForm.setField("imagePath", imagePath);
+      setPhoto({
+        uploading: false,
+        message: shrunk ? "" : "이 형식은 브라우저에 따라 미리보기가 보이지 않을 수 있습니다.",
+      });
+    } catch (err) {
+      setPhoto({ uploading: false, message: toMessage(err, "사진을 올리지 못했습니다.") });
     }
   }
 
-  function handleDelete() {
-    if (window.confirm(`관리번호 ${manageNo} 건을 삭제하시겠습니까?`)) {
-      deleteFoundItem(manageNo);
-      navigate("/");
+  /** 사진을 떼어 낸다. 서버의 파일은 지우지 않는다(다른 글이 쓰고 있을 수 있다). */
+  function handleRemovePhoto() {
+    recordForm.setField("imagePath", "");
+    setPhoto({ uploading: false, message: "" });
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (sending || photo.uploading || !checkRequired(REQUIRED_FIELDS)) return;
+    setSending(true);
+    try {
+      if (isNew) {
+        const created = await foundItemApi.create(form);
+        navigate(`/found/${created.manageNo}`, { replace: true });
+      } else {
+        await foundItemApi.update(manageNo, saved, form);
+        navigate(`/found/${form.manageNo}`, { replace: true });
+      }
+    } catch (err) {
+      setError(toMessage(err, "저장하지 못했습니다."));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`관리번호 ${manageNo} 건을 삭제하시겠습니까?\n서버에서 완전히 지워집니다.`)) return;
+    setSending(true);
+    try {
+      await foundItemApi.remove(manageNo);
+      navigate("/", { replace: true });
+    } catch (err) {
+      setError(toMessage(err, "삭제하지 못했습니다."));
+      setSending(false);
     }
   }
 
@@ -94,19 +154,22 @@ export default function FoundItemPage({ mode }) {
   return (
     <div className="page form-page">
       <PageHeader title={title} />
-      <ManageNoBadge manageNo={isNew ? peekFoundManageNo() : manageNo} />
+      <ManageNoBadge manageNo={form.manageNo} />
 
       <RecordFormContext.Provider value={{ ...recordForm, readOnly }}>
         <form onSubmit={handleSubmit}>
           <div className="record-layout">
-            <PhotoCard image={form.image}
-              onPick={readOnly ? undefined : handleImage} onRemove={removeImage} />
+            <PhotoCard imageSrc={imageUrl(form.imagePath)}
+              onPick={readOnly ? undefined : handlePickPhoto}
+              onRemove={handleRemovePhoto}
+              uploading={photo.uploading}
+              error={photo.message} />
 
             <div className="record-sections">
               <Section title="물품 정보" cols={2}>
-                <Field label="물품 구분" name="category_id" type="select" numeric
+                <Field label="물품 구분" name="categoryId" type="select" numeric
                   placeholder="선택하세요"
-                  options={selectOptions(itemCategoryTable, form.category_id)} />
+                  options={selectOptions(categories, form.categoryId)} />
                 <Field label="물품명" name="itemName" placeholder="예) 신분증, 카드지갑, 텀블러 등" />
                 <Field label="특징" name="feature" placeholder="입력해주세요" full />
                 <Field label="분실 장소" name="lostPlace" placeholder="입력해주세요" />
@@ -125,12 +188,15 @@ export default function FoundItemPage({ mode }) {
                   format={formatPhone} inputMode="numeric" />
                 <Field label="연락 여부" name="contacted" type="select"
                   options={toOptions(CONTACTED_OPTIONS)} />
-                <Field label="처리결과" name="result_id" type="select" numeric
-                  options={selectOptions(processResultTable, form.result_id)} />
-                <Field label="기간 만료 시 조치 방법" type="computed" value={expireAction}
-                  placeholder="물품 구분 선택 시 표시" />
-                <Field label="확인자" name="checker" type="select" placeholder="--선택--"
-                  options={toOptions(STAFF_NAMES)} />
+                <Field label="처리결과" name="resultId" type="select" numeric
+                  options={selectOptions(results, form.resultId)} />
+                <Field label="기간 만료 시 조치 방법" type="computed"
+                  value={category?.expire_action ?? ""} placeholder="물품 구분 선택 시 표시" />
+                <Field label="처리일" name="processedDate" type="date" />
+                <Field label="확인자" name="checkerId" type="select" numeric placeholder="--선택--"
+                  options={users.map((u) => ({ value: u.id, label: u.name }))} />
+                <Field label="사진 경로" type="computed" value={form.imagePath}
+                  placeholder="사진을 올리면 자동 입력" />
               </Section>
             </div>
           </div>
@@ -144,12 +210,15 @@ export default function FoundItemPage({ mode }) {
               </>
             ) : (
               <>
-                <button type="button" className="btn"
+                <button type="button" className="btn" disabled={sending}
                   onClick={() => navigate(isNew ? "/" : `/found/${manageNo}`)}>취소</button>
                 {!isNew && (
-                  <button type="button" className="btn danger" onClick={handleDelete}>삭제</button>
+                  <button type="button" className="btn danger" disabled={sending}
+                    onClick={handleDelete}>삭제</button>
                 )}
-                <button type="submit" className="btn primary">{isNew ? "등록" : "저장"}</button>
+                <button type="submit" className="btn primary" disabled={sending}>
+                  {sending ? "저장 중..." : isNew ? "등록" : "저장"}
+                </button>
               </>
             )}
           </ActionBar>
