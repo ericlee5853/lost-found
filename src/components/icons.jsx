@@ -35,19 +35,22 @@ export function FilterIcon() {
   );
 }
 
-/** 왼쪽 꺾쇠 (이전 쪽) */
-export function ChevronLeftIcon() {
+/**
+ * 왼쪽 꺾쇠. 쪽번호에서는 작게, 사진 넘기기에서는 크게 쓴다.
+ * @param {number} [size] 아이콘 크기
+ */
+export function ChevronLeftIcon({ size = 16 }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" {...base} strokeWidth={1.6}>
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base} strokeWidth={1.6}>
       <path d="M15 5l-7 7 7 7" />
     </svg>
   );
 }
 
-/** 오른쪽 꺾쇠 (다음 쪽) */
-export function ChevronRightIcon() {
+/** 오른쪽 꺾쇠 */
+export function ChevronRightIcon({ size = 16 }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" {...base} strokeWidth={1.6}>
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base} strokeWidth={1.6}>
       <path d="M9 5l7 7-7 7" />
     </svg>
   );
@@ -88,6 +91,17 @@ export function CalendarIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" {...base}>
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+/** 사진기에 더하기 (사진을 더 넣을 빈 칸) */
+export function CameraPlusIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" {...base} strokeWidth={1.6}>
+      <path d="M3 8.8A1.5 1.5 0 014.5 7.3h2.1l1-1.7h6.3l1 1.7h2.1A1.5 1.5 0 0118.5 8.8v8.4A1.5 1.5 0 0117 18.7H4.5A1.5 1.5 0 013 17.2z" />
+      <circle cx="10.75" cy="12.6" r="2.9" />
+      <path d="M19.5 4.2v5M22 6.7h-5" />
     </svg>
   );
 }

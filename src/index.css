@@ -296,37 +296,38 @@ select.input {
 .field.full { grid-column: 1 / -1; }
 .field-label { display: block; margin-bottom: 7px; font-size: 14.5px; font-weight: var(--weight-body); line-height: 19px; }
 
-/* 사진 카드 */
-.photo-card { align-items: stretch; gap: 10px; padding: 18px 22px 20px; }
+/* 사진 카드: 옆 칸 높이에 맞춰 늘어나고, 큰 사진이 남는 자리를 채운다 */
+.photo-card { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 18px 22px 20px; }
 .photo-card .card-title { margin-bottom: 2px; }
 .card-title-sub { margin-left: 6px; font-size: 13px; color: var(--text-muted); font-weight: var(--weight-body); }
 
 /* 큰 사진 */
 .photo-stage {
-  position: relative; width: 100%; height: 260px; border-radius: var(--radius-lg);
+  position: relative; width: 100%; flex: 1; min-height: 240px; border-radius: var(--radius-lg);
   background: var(--thumb); overflow: hidden;
   display: flex; align-items: center; justify-content: center;
 }
-.photo-stage img { width: 100%; height: 100%; object-fit: contain; background: #e9eaec; }
+.photo-stage img { width: 100%; height: 100%; object-fit: cover; }
 .photo-empty { color: #8d9298; font-size: 14px; }
+/* 좌우 화살표: 동그라미 없이 흰 꺾쇠만 (사진 위에서도 보이도록 그림자) */
 .photo-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
-  width: 32px; height: 32px; border: none; border-radius: 50%;
-  background: rgba(255, 255, 255, .85); color: #333;
+  width: 34px; height: 46px; border: none; background: none; color: #fff;
   display: flex; align-items: center; justify-content: center;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .45));
 }
-.photo-nav:hover { background: #fff; }
-.photo-nav.left { left: 8px; }
-.photo-nav.right { right: 8px; }
+.photo-nav:hover { color: #e9eef2; }
+.photo-nav.left { left: 2px; }
+.photo-nav.right { right: 2px; }
 .photo-count {
-  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
-  padding: 3px 12px; border-radius: 12px;
-  background: rgba(0, 0, 0, .55); color: #fff; font-size: 12px;
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  padding: 4px 13px; border-radius: 6px;
+  background: rgba(60, 60, 60, .72); color: #fff; font-size: 13px;
 }
 .photo-del {
-  position: absolute; right: 10px; bottom: 10px;
-  width: 30px; height: 30px; border: none; border-radius: 8px;
-  background: rgba(0, 0, 0, .55); color: #fff;
+  position: absolute; right: 12px; bottom: 12px;
+  width: 32px; height: 32px; border: none; border-radius: 8px;
+  background: rgba(60, 60, 60, .72); color: #fff;
   display: flex; align-items: center; justify-content: center;
 }
 .photo-del:hover { background: var(--danger); }
@@ -334,13 +335,14 @@ select.input {
 /* 작은 사진 줄 */
 .thumb-row { display: flex; gap: 6px; }
 .thumb-item {
-  flex: 1 1 0; min-width: 0; aspect-ratio: 1 / 1; padding: 0; border-radius: 8px; overflow: hidden;
+  flex: 0 0 calc((100% - 24px) / 5); min-width: 0; aspect-ratio: 1 / 1;
+  padding: 0; border-radius: 8px; overflow: hidden;
   border: 2px solid transparent; background: var(--thumb);
   display: flex; align-items: center; justify-content: center;
 }
 .thumb-item img { width: 100%; height: 100%; object-fit: cover; }
 .thumb-item.on { border-color: var(--primary); }
-.thumb-item.add { background: var(--bg-page); border: 1px dashed #c3c9d2; color: #b3b9c2; }
+.thumb-item.add { background: #fbfcfd; border: 1.5px dashed #c3c9d2; color: #aab1ba; }
 
 /* 사진 촬영 · 파일 업로드 */
 .photo-buttons { display: flex; gap: 8px; margin-top: 2px; }
@@ -374,14 +376,19 @@ select.input {
 .login-hint { margin-top: 14px; text-align: center; font-size: 13px; color: var(--text-muted); }
 
 /* ---------- 분실물 상세·접수 배치 ---------- */
-/* 윗줄: 사진 / 기본·습득 / 물품·보관 */
-.record-top { display: grid; grid-template-columns: 0.76fr 1fr 1.18fr; gap: 18px; align-items: start; }
+/* 윗줄: 사진(두 줄에 걸침) / 기본·습득 / 물품·보관
+   같은 줄의 카드는 높이가 같아져 아래 선이 맞는다. */
+.record-top {
+  display: grid; grid-template-columns: 0.76fr 1fr 1.18fr;
+  grid-auto-rows: auto; gap: 18px; align-items: stretch;
+}
+.record-top > .photo-card { grid-row: span 2; }
 /* 가운뎃줄: 습득자 / 관리 */
-.record-mid { display: grid; grid-template-columns: 1.08fr 1fr; gap: 18px; align-items: start; margin-top: 18px; }
-.record-col { display: flex; flex-direction: column; gap: 18px; }
+.record-mid { display: grid; grid-template-columns: 1.08fr 1fr; gap: 18px; align-items: stretch; margin-top: 18px; }
 .record-mid + .card, .record-top + .card { margin-top: 18px; }
 .card + .card { margin-top: 18px; }
-.record-col .card + .card { margin-top: 0; }
+/* 격자 안에서는 칸 사이 간격(gap)이 이미 있으므로 여백을 더하지 않는다 */
+.record-top > .card + .card, .record-mid > .card + .card { margin-top: 0; }
 
 /* 이름이 왼쪽에 오는 입력 줄 */
 .form-rows { display: flex; flex-direction: column; gap: 10px; }

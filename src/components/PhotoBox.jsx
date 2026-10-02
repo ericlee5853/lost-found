@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { IMAGE_ACCEPT, MAX_PHOTOS, checkImageFile, shrinkToDataUrl } from "../imageFile";
-import { CameraIcon, UploadIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon } from "./icons";
+import { CameraIcon, CameraPlusIcon, UploadIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon } from "./icons";
 
 /**
  * @param {string[]} photos    사진 목록 (지금은 그림 데이터, 서버 연동 뒤에는 주소)
@@ -82,9 +82,9 @@ export default function PhotoBox({ photos = [], onChange }) {
             {count > 1 && (
               <>
                 <button type="button" className="photo-nav left" onClick={() => move(-1)}
-                  aria-label="이전 사진"><ChevronLeftIcon /></button>
+                  aria-label="이전 사진"><ChevronLeftIcon size={26} /></button>
                 <button type="button" className="photo-nav right" onClick={() => move(1)}
-                  aria-label="다음 사진"><ChevronRightIcon /></button>
+                  aria-label="다음 사진"><ChevronRightIcon size={26} /></button>
               </>
             )}
             <span className="photo-count">{current + 1} / {count}</span>
@@ -105,7 +105,7 @@ export default function PhotoBox({ photos = [], onChange }) {
           </button>
         ))}
         {editable && Array.from({ length: MAX_PHOTOS - count }).map((_, i) => (
-          <span className="thumb-item add" key={`add-${i}`}><CameraIcon /></span>
+          <span className="thumb-item add" key={`add-${i}`}><CameraPlusIcon /></span>
         ))}
       </div>
 

@@ -114,102 +114,99 @@ export default function FoundItemPage({ mode }) {
 
       <RecordFormContext.Provider value={{ ...recordForm, readOnly }}>
         <form onSubmit={handleSubmit}>
-          {/* 윗줄: 사진 · 기본과 습득 · 물품과 보관 */}
+          {/* 윗줄: 사진(두 칸에 걸침) · 기본/습득 · 물품/보관
+              같은 줄의 카드는 높이가 같아져 아래 선이 맞는다. */}
           <div className="record-top">
             <PhotoBox photos={form.images}
               onChange={readOnly ? undefined : (list) => setField("images", list)} />
 
-            <div className="record-col">
-              <section className="card">
-                <h2 className="card-title">기본 정보</h2>
-                <div className="form-rows">
-                  <FormRow>
-                    <FormField label="관리번호">
-                      <ReadOnlyBox value={form.manageNo} muted />
-                      <span className="tagline small">{isNew ? "자동생성" : "고정"}</span>
-                    </FormField>
-                  </FormRow>
-                  <FormRow>
-                    <FormField label="접수일" required><DateInput name="receivedDate" /></FormField>
-                  </FormRow>
-                  <FormRow>
-                    <FormField label="접수 담당자">
-                      <ReadOnlyBox value={nameOf(ref.users, form.checkerId)} muted
-                        placeholder="로그인한 담당자" />
-                    </FormField>
-                  </FormRow>
-                </div>
-              </section>
+            <section className="card">
+              <h2 className="card-title">기본 정보</h2>
+              <div className="form-rows">
+                <FormRow>
+                  <FormField label="관리번호">
+                    <ReadOnlyBox value={form.manageNo} muted />
+                    <span className="tagline small">{isNew ? "자동생성" : "고정"}</span>
+                  </FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="접수일" required><DateInput name="receivedDate" /></FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="접수 담당자">
+                    <ReadOnlyBox value={nameOf(ref.users, form.checkerId)} muted
+                      placeholder="로그인한 담당자" />
+                  </FormField>
+                </FormRow>
+              </div>
+            </section>
 
-              <section className="card">
-                <h2 className="card-title">습득 정보</h2>
-                <div className="form-rows">
-                  <FormRow>
-                    <FormField label="습득일" required><DateInput name="foundDate" /></FormField>
-                  </FormRow>
-                  <FormRow>
-                    <FormField label="습득 장소" required>
-                      <SelectInput name="foundBuildingId" numeric placeholder="건물 선택"
-                        options={selectOptions(ref.buildings, form.foundBuildingId)} />
-                      <TextInput name="foundPlaceDetail" placeholder="예) 2층 복도 자판기 앞" />
-                    </FormField>
-                  </FormRow>
-                </div>
-              </section>
-            </div>
+            <section className="card">
+              <h2 className="card-title">물품 정보</h2>
+              <div className="form-rows">
+                <FormRow>
+                  <FormField label="물품 구분" required>
+                    <SelectInput name="categoryId" numeric placeholder="선택하세요"
+                      options={selectOptions(ref.categories, form.categoryId)} />
+                  </FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="물품명" required>
+                    <TextInput name="itemName" placeholder="예) 신분증, 카드지갑, 텀블러" />
+                  </FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="특징">
+                    <TextArea name="feature" placeholder="색상, 상표, 흠집 등 알아볼 수 있는 내용" />
+                  </FormField>
+                </FormRow>
+              </div>
+            </section>
 
-            <div className="record-col">
-              <section className="card">
-                <h2 className="card-title">물품 정보</h2>
-                <div className="form-rows">
-                  <FormRow>
-                    <FormField label="물품 구분" required>
-                      <SelectInput name="categoryId" numeric placeholder="선택하세요"
-                        options={selectOptions(ref.categories, form.categoryId)} />
-                    </FormField>
-                  </FormRow>
-                  <FormRow>
-                    <FormField label="물품명" required>
-                      <TextInput name="itemName" placeholder="예) 신분증, 카드지갑, 텀블러" />
-                    </FormField>
-                  </FormRow>
-                  <FormRow>
-                    <FormField label="특징">
-                      <TextArea name="feature" placeholder="색상, 상표, 흠집 등 알아볼 수 있는 내용" />
-                    </FormField>
-                  </FormRow>
-                </div>
-              </section>
+            <section className="card">
+              <h2 className="card-title">습득 정보</h2>
+              <div className="form-rows">
+                <FormRow>
+                  <FormField label="습득일" required><DateInput name="foundDate" /></FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="습득 장소" required>
+                    <SelectInput name="foundBuildingId" numeric placeholder="건물 선택"
+                      options={selectOptions(ref.buildings, form.foundBuildingId)} />
+                    <TextInput name="foundPlaceDetail" placeholder="예) 2층 복도 자판기 앞" />
+                  </FormField>
+                </FormRow>
+              </div>
+            </section>
 
-              <section className="card">
-                <h2 className="card-title">보관 정보</h2>
-                <div className="form-rows">
-                  <FormRow>
-                    <FormField label="보관 장소" required>
-                      <SelectInput name="storagePlaceId" numeric placeholder="보관 장소 선택"
-                        options={selectOptions(ref.storagePlaces, form.storagePlaceId)} />
-                      <TextInput name="storageDetail" placeholder="예) A-03" />
-                    </FormField>
-                  </FormRow>
-                  <FormRow>
-                    <FormField label="보관 만료일">
-                      <ReadOnlyBox value={deadline} muted placeholder="물품 구분을 고르면 자동 계산" />
-                    </FormField>
-                  </FormRow>
-                </div>
-                {/* 보관 기간 요약 */}
-                <div className="storage-summary">
-                  <CalendarIcon />
-                  <b>보관 기간 : {months ? `${months}개월` : "-"}</b>
-                  {left !== null && (
-                    <span className="summary-left">
-                      {left >= 0 ? `(잔여 ${left}일)` : `(기한 ${-left}일 지남)`}
-                    </span>
-                  )}
-                  <span className="summary-note">보관기간은 물품 구분 설정에 따라 자동 계산됩니다.</span>
-                </div>
-              </section>
-            </div>
+            <section className="card">
+              <h2 className="card-title">보관 정보</h2>
+              <div className="form-rows">
+                <FormRow>
+                  <FormField label="보관 장소" required>
+                    <SelectInput name="storagePlaceId" numeric placeholder="보관 장소 선택"
+                      options={selectOptions(ref.storagePlaces, form.storagePlaceId)} />
+                    <TextInput name="storageDetail" placeholder="예) A-03" />
+                  </FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="보관 만료일">
+                    <ReadOnlyBox value={deadline} muted placeholder="물품 구분을 고르면 자동 계산" />
+                  </FormField>
+                </FormRow>
+              </div>
+              {/* 보관 기간 요약 */}
+              <div className="storage-summary">
+                <CalendarIcon />
+                <b>보관 기간 : {months ? `${months}개월` : "-"}</b>
+                {left !== null && (
+                  <span className="summary-left">
+                    {left >= 0 ? `(잔여 ${left}일)` : `(기한 ${-left}일 지남)`}
+                  </span>
+                )}
+                <span className="summary-note">보관기간은 물품 구분 설정에 따라 자동 계산됩니다.</span>
+              </div>
+            </section>
           </div>
 
           {/* 가운뎃줄: 습득자 · 관리 */}
