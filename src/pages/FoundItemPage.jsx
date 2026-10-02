@@ -4,17 +4,16 @@ import { foundApi } from "../data/records";
 import { useReference, nameOf, selectOptions } from "../referenceContext";
 import { CONTACTED_OPTIONS, FINDER_TYPES, toOptions } from "../constants";
 import { formatPhone } from "../formatUtil";
-import { today, previewDeadline } from "../dateUtil";
+import { today, previewDeadline, daysLeft } from "../dateUtil";
 import { useRecordForm } from "../useRecordForm";
 import { RecordFormContext } from "../formContext";
 import PageHeader from "../components/PageHeader";
-import ManageNoBadge from "../components/ManageNoBadge";
 import PhotoBox from "../components/PhotoBox";
-import Section from "../components/Section";
-import Field from "../components/Field";
-import ActionBar from "../components/ActionBar";
 import StatusPill from "../components/StatusPill";
 import NotFoundBox from "../components/NotFoundBox";
+import FormField, { FormRow } from "../components/FormField";
+import { TextInput, TextArea, DateInput, SelectInput, RadioGroup, ReadOnlyBox } from "../components/inputs";
+import { CalendarIcon } from "../components/icons";
 
 /** 새 접수 화면의 첫 값 */
 function emptyForm(manageNo, meId, keepStatusId) {
@@ -36,15 +35,15 @@ const REQUIRED = [
   ["itemName", "물품명을 입력하세요."],
   ["receivedDate", "접수일을 입력하세요."],
   ["foundDate", "습득일을 입력하세요."],
-  ["foundBuildingId", "습득장소를 고르세요."],
-  ["storagePlaceId", "보관장소를 고르세요."],
+  ["foundBuildingId", "습득 장소를 고르세요."],
+  ["storagePlaceId", "보관 장소를 고르세요."],
   ["finderType", "습득자 구분을 고르세요."],
-  ["resultId", "처리상태를 고르세요."],
+  ["resultId", "처리 상태를 고르세요."],
 ];
 
 /**
  * 분실물 한 건의 상세 / 접수 / 수정 화면.
- * 세 화면이 같은 배치를 쓰고, 상세에서는 입력칸 대신 값만 보여 준다.
+ * 세 화면이 같은 배치를 쓰고, 상세에서는 입력칸 자리에 값만 보여 준다.
  * @param {"view"|"edit"} mode
  */
 export default function FoundItemPage({ mode }) {
@@ -57,21 +56,23 @@ export default function FoundItemPage({ mode }) {
   const saved = isNew ? null : foundApi.get(manageNo);
   const keepStatusId = ref.results.find((r) => r.name.includes("보관"))?.id ?? ref.results[0]?.id ?? "";
   const [newNo] = useState(() => (isNew ? foundApi.nextManageNo() : ""));
+  const blank = () => emptyForm(newNo, ref.me.id, keepStatusId);
 
-  const recordForm = useRecordForm(() => saved ?? emptyForm(newNo, ref.me.id, keepStatusId));
-  const { form, setField, error, setError, checkRequired } = recordForm;
+  const recordForm = useRecordForm(() => saved ?? blank());
+  const { form, setField, setForm, error, setError, checkRequired } = recordForm;
 
   if (!isNew && !saved) return <NotFoundBox manageNo={manageNo} backTo="/found" />;
 
-  // 보관만료일: 습득일 + 물품 구분의 보관 개월. 저장할 때 같이 적어 둔다.
+  // 보관 만료일: 습득일 + 물품 구분의 보관 개월. 저장할 때 함께 적어 둔다.
   const category = ref.categories.find((c) => c.id === Number(form.categoryId));
-  const deadline = previewDeadline(form.foundDate, Number(category?.storage_months));
-  const expireAction = category?.expire_action ?? "";
+  const months = Number(category?.storage_months) || 0;
+  const deadline = readOnly ? form.deadline : previewDeadline(form.foundDate, months);
+  const expireAction = readOnly ? form.expireAction : (category?.expire_action ?? "");
+  const left = daysLeft(deadline);
 
-  // 습득자 구분에 따라 번호 칸의 이름이 바뀌고, 외부인·기타는 번호를 받지 않는다.
+  // 습득자 구분에 따라 번호 칸 이름이 바뀌고, 외부인·기타는 번호를 받지 않는다.
   const numberLabel = form.finderType === "교직원" ? "교직원번호" : "학번";
   const needNumber = form.finderType === "학생" || form.finderType === "교직원";
-
   const returned = Boolean(form.returnDate);
 
   function handleSubmit(e) {
@@ -91,6 +92,12 @@ export default function FoundItemPage({ mode }) {
     }
   }
 
+  function handleReset() {
+    if (!window.confirm("입력한 내용을 모두 지우고 처음 상태로 되돌립니다. 계속할까요?")) return;
+    setForm(blank());
+    setError("");
+  }
+
   function handleDelete() {
     if (!window.confirm(`관리번호 ${manageNo} 건을 지우시겠습니까?`)) return;
     foundApi.remove(manageNo);
@@ -98,112 +105,267 @@ export default function FoundItemPage({ mode }) {
   }
 
   const title = readOnly ? "분실물 상세" : isNew ? "분실물 접수" : "분실물 수정";
+  const titleSub = readOnly ? "등록된 분실물의 내용입니다."
+    : isNew ? "습득한 분실물을 등록하여 관리하는 화면입니다." : "등록된 내용을 고칩니다.";
 
   return (
     <>
-      <PageHeader title={title} />
-      <ManageNoBadge manageNo={form.manageNo}>
-        {readOnly && <StatusPill name={nameOf(ref.results, form.resultId)} />}
-      </ManageNoBadge>
+      <PageHeader title={title} sub={titleSub} />
 
       <RecordFormContext.Provider value={{ ...recordForm, readOnly }}>
         <form onSubmit={handleSubmit}>
-          <div className="record-layout">
+          {/* 윗줄: 사진 · 기본과 습득 · 물품과 보관 */}
+          <div className="record-top">
             <PhotoBox photos={form.images}
               onChange={readOnly ? undefined : (list) => setField("images", list)} />
 
-            <div className="record-sections">
-              <Section title="기본 정보" cols={3}>
-                <Field label="접수일" name="receivedDate" type="date" required />
-                <Field label="접수담당자" type="computed"
-                  value={nameOf(ref.users, form.checkerId)} placeholder="로그인한 담당자" />
-              </Section>
+            <div className="record-col">
+              <section className="card">
+                <h2 className="card-title">기본 정보</h2>
+                <div className="form-rows">
+                  <FormRow>
+                    <FormField label="관리번호">
+                      <ReadOnlyBox value={form.manageNo} muted />
+                      <span className="tagline small">{isNew ? "자동생성" : "고정"}</span>
+                    </FormField>
+                  </FormRow>
+                  <FormRow>
+                    <FormField label="접수일" required><DateInput name="receivedDate" /></FormField>
+                  </FormRow>
+                  <FormRow>
+                    <FormField label="접수 담당자">
+                      <ReadOnlyBox value={nameOf(ref.users, form.checkerId)} muted
+                        placeholder="로그인한 담당자" />
+                    </FormField>
+                  </FormRow>
+                </div>
+              </section>
 
-              <Section title="물품 정보" cols={2}>
-                <Field label="물품 구분" name="categoryId" type="select" numeric required
-                  placeholder="선택하세요" options={selectOptions(ref.categories, form.categoryId)} />
-                <Field label="물품명" name="itemName" required placeholder="예) 신분증, 카드지갑, 텀블러" />
-                <Field label="특징" name="feature" placeholder="입력해주세요" full />
-              </Section>
+              <section className="card">
+                <h2 className="card-title">습득 정보</h2>
+                <div className="form-rows">
+                  <FormRow>
+                    <FormField label="습득일" required><DateInput name="foundDate" /></FormField>
+                  </FormRow>
+                  <FormRow>
+                    <FormField label="습득 장소" required>
+                      <SelectInput name="foundBuildingId" numeric placeholder="건물 선택"
+                        options={selectOptions(ref.buildings, form.foundBuildingId)} />
+                      <TextInput name="foundPlaceDetail" placeholder="예) 2층 복도 자판기 앞" />
+                    </FormField>
+                  </FormRow>
+                </div>
+              </section>
+            </div>
 
-              <Section title="습득 정보">
-                <Field label="습득일" name="foundDate" type="date" required />
-                <Field label="습득장소" name="foundBuildingId" type="select" numeric required
-                  placeholder="건물 선택" options={selectOptions(ref.buildings, form.foundBuildingId)} />
-                <Field label="습득장소 상세" name="foundPlaceDetail" placeholder="예) 2층 복도 자판기 앞" />
-              </Section>
+            <div className="record-col">
+              <section className="card">
+                <h2 className="card-title">물품 정보</h2>
+                <div className="form-rows">
+                  <FormRow>
+                    <FormField label="물품 구분" required>
+                      <SelectInput name="categoryId" numeric placeholder="선택하세요"
+                        options={selectOptions(ref.categories, form.categoryId)} />
+                    </FormField>
+                  </FormRow>
+                  <FormRow>
+                    <FormField label="물품명" required>
+                      <TextInput name="itemName" placeholder="예) 신분증, 카드지갑, 텀블러" />
+                    </FormField>
+                  </FormRow>
+                  <FormRow>
+                    <FormField label="특징">
+                      <TextArea name="feature" placeholder="색상, 상표, 흠집 등 알아볼 수 있는 내용" />
+                    </FormField>
+                  </FormRow>
+                </div>
+              </section>
 
-              <Section title="보관 정보">
-                <Field label="보관장소" name="storagePlaceId" type="select" numeric required
-                  placeholder="보관장소 선택" options={selectOptions(ref.storagePlaces, form.storagePlaceId)} />
-                <Field label="보관 세부" name="storageDetail" placeholder="예) A-03" />
-                <Field label="보관만료일" type="computed"
-                  value={readOnly ? form.deadline : deadline} placeholder="자동 계산" />
-              </Section>
-
-              <Section title="습득자 정보">
-                <Field label="습득자 구분" name="finderType" type="select" required
-                  options={toOptions(FINDER_TYPES)} />
-                {needNumber
-                  ? <Field label={numberLabel} name="finderNo" placeholder={`${numberLabel}를 입력하세요`} />
-                  : <Field label="번호" type="computed" value="" placeholder="외부인·기타는 받지 않음" />}
-                <Field label="성명" name="finderName" placeholder="이름을 입력하세요" />
-                <Field label="연락처" name="finderContact" format={formatPhone}
-                  inputMode="numeric" placeholder="010-0000-0000" />
-              </Section>
-
-              <Section title="분실자 정보">
-                <Field label="분실자" name="ownerName" placeholder="이름을 입력하세요" />
-                <Field label="연락처" name="ownerContact" format={formatPhone}
-                  inputMode="numeric" placeholder="010-0000-0000" />
-                <Field label="연락 여부" name="contacted" type="select" options={toOptions(CONTACTED_OPTIONS)} />
-              </Section>
-
-              <Section title="관리 정보">
-                <Field label="처리상태" name="resultId" type="select" numeric required
-                  options={selectOptions(ref.results, form.resultId)} />
-                <Field label="만료 시 조치 방법" type="computed"
-                  value={readOnly ? form.expireAction : expireAction} placeholder="물품 구분을 고르면 표시" />
-                <Field label="처리일" name="processedDate" type="date" />
-                <Field label="비고" name="note" placeholder="특이사항이 있으면 입력하세요" full />
-              </Section>
-
-              {/* 반환이 끝난 건에만 보여 준다 */}
-              {returned && (
-                <Section title="반환 정보">
-                  <Field label="수령자 학번" type="computed" value={form.receiverNo} placeholder="-" />
-                  <Field label="수령자 이름" type="computed" value={form.receiverName} placeholder="-" />
-                  <Field label="수령일" type="computed" value={form.returnDate} placeholder="-" />
-                  <Field label="확인 방법" type="computed" value={form.verifyMethod} placeholder="-" />
-                  <Field label="확인담당자" type="computed"
-                    value={nameOf(ref.users, form.verifyCheckerId)} placeholder="-" />
-                </Section>
-              )}
+              <section className="card">
+                <h2 className="card-title">보관 정보</h2>
+                <div className="form-rows">
+                  <FormRow>
+                    <FormField label="보관 장소" required>
+                      <SelectInput name="storagePlaceId" numeric placeholder="보관 장소 선택"
+                        options={selectOptions(ref.storagePlaces, form.storagePlaceId)} />
+                      <TextInput name="storageDetail" placeholder="예) A-03" />
+                    </FormField>
+                  </FormRow>
+                  <FormRow>
+                    <FormField label="보관 만료일">
+                      <ReadOnlyBox value={deadline} muted placeholder="물품 구분을 고르면 자동 계산" />
+                    </FormField>
+                  </FormRow>
+                </div>
+                {/* 보관 기간 요약 */}
+                <div className="storage-summary">
+                  <CalendarIcon />
+                  <b>보관 기간 : {months ? `${months}개월` : "-"}</b>
+                  {left !== null && (
+                    <span className="summary-left">
+                      {left >= 0 ? `(잔여 ${left}일)` : `(기한 ${-left}일 지남)`}
+                    </span>
+                  )}
+                  <span className="summary-note">보관기간은 물품 구분 설정에 따라 자동 계산됩니다.</span>
+                </div>
+              </section>
             </div>
           </div>
 
-          <ActionBar message={error}>
-            {readOnly ? (
-              <>
-                <button type="button" className="btn" onClick={() => navigate("/found")}>목록</button>
-                {!returned && (
+          {/* 가운뎃줄: 습득자 · 관리 */}
+          <div className="record-mid">
+            <section className="card">
+              <h2 className="card-title">습득자 정보</h2>
+              <div className="form-rows">
+                <FormRow>
+                  <FormField label="습득자 구분" required>
+                    <RadioGroup name="finderType" options={FINDER_TYPES} />
+                  </FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label={numberLabel}>
+                    {needNumber
+                      ? <TextInput name="finderNo" placeholder={`${numberLabel}를 입력하세요`} />
+                      : <ReadOnlyBox value="" muted placeholder="외부인·기타는 받지 않음" />}
+                  </FormField>
+                  <FormField label="성명">
+                    <TextInput name="finderName" placeholder="이름을 입력하세요" />
+                  </FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="연락처">
+                    <TextInput name="finderContact" format={formatPhone}
+                      inputMode="numeric" placeholder="010-0000-0000" />
+                  </FormField>
+                </FormRow>
+              </div>
+            </section>
+
+            <section className="card wide-label">
+              <h2 className="card-title">관리 정보</h2>
+              <div className="form-rows">
+                <FormRow>
+                  <FormField label="처리 상태" required>
+                    {readOnly
+                      ? <StatusPill name={nameOf(ref.results, form.resultId)} />
+                      : <SelectInput name="resultId" numeric
+                          options={selectOptions(ref.results, form.resultId)} />}
+                  </FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="보관기간 만료 시 조치 방법">
+                    <ReadOnlyBox value={expireAction} muted placeholder="물품 구분을 고르면 표시" />
+                  </FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="처리일"><DateInput name="processedDate" /></FormField>
+                </FormRow>
+                <FormRow>
+                  <FormField label="비고">
+                    <TextArea name="note" placeholder="특이사항이 있으면 입력하세요" rows={2} />
+                  </FormField>
+                </FormRow>
+              </div>
+            </section>
+          </div>
+
+          {/* 분실자 정보 */}
+          <section className="card">
+            <h2 className="card-title">분실자 정보</h2>
+            <div className="form-rows">
+              <FormRow>
+                <FormField label="분실자"><TextInput name="ownerName" placeholder="이름을 입력하세요" /></FormField>
+                <FormField label="연락처">
+                  <TextInput name="ownerContact" format={formatPhone}
+                    inputMode="numeric" placeholder="010-0000-0000" />
+                </FormField>
+                <FormField label="연락 여부">
+                  <SelectInput name="contacted" options={toOptions(CONTACTED_OPTIONS)} />
+                </FormField>
+              </FormRow>
+            </div>
+          </section>
+
+          {/* 처리 이력 */}
+          <HistoryCard item={form} users={ref.users} returned={returned} />
+
+          {error && <p className="form-error bottom-error">{error}</p>}
+
+          <div className="bottom-bar">
+            <button type="button" className="btn" onClick={() => navigate("/found")}>목록으로</button>
+            <div className="bottom-right">
+              {readOnly ? (
+                <>
+                  {!returned && (
+                    <button type="button" className="btn"
+                      onClick={() => navigate(`/found/${manageNo}/return`)}>반환 처리</button>
+                  )}
+                  <button type="button" className="btn primary"
+                    onClick={() => navigate(`/found/${manageNo}/edit`)}>수정</button>
+                </>
+              ) : isNew ? (
+                <>
+                  <button type="button" className="btn" onClick={handleReset}>초기화</button>
+                  <button type="submit" className="btn primary">접수 등록</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="btn danger" onClick={handleDelete}>삭제</button>
                   <button type="button" className="btn"
-                    onClick={() => navigate(`/found/${manageNo}/return`)}>반환 처리</button>
-                )}
-                <button type="button" className="btn primary"
-                  onClick={() => navigate(`/found/${manageNo}/edit`)}>수정</button>
-              </>
-            ) : (
-              <>
-                <button type="button" className="btn"
-                  onClick={() => navigate(isNew ? "/found" : `/found/${manageNo}`)}>취소</button>
-                {!isNew && <button type="button" className="btn danger" onClick={handleDelete}>삭제</button>}
-                <button type="submit" className="btn primary">{isNew ? "등록" : "저장"}</button>
-              </>
-            )}
-          </ActionBar>
+                    onClick={() => navigate(`/found/${manageNo}`)}>취소</button>
+                  <button type="submit" className="btn primary">저장</button>
+                </>
+              )}
+            </div>
+          </div>
         </form>
       </RecordFormContext.Provider>
     </>
+  );
+}
+
+/**
+ * 처리 이력.
+ * 따로 적어 두는 자료가 아니라 접수·반환 기록에서 만들어 보여 준다.
+ */
+function HistoryCard({ item, users, returned }) {
+  const rows = [];
+  if (item.receivedDate) {
+    rows.push({ date: item.receivedDate, kind: "접수",
+      text: `${item.itemName || "물품"} 접수`, who: item.checkerId });
+  }
+  if (returned) {
+    rows.push({ date: item.returnDate, kind: "반환",
+      text: `${item.receiverName || "수령자"} 수령 · ${item.verifyMethod || "확인"}`,
+      who: item.verifyCheckerId });
+  }
+
+  return (
+    <section className="card">
+      <h2 className="card-title">처리 이력</h2>
+      <table className="data-table history-table">
+        <colgroup>
+          <col style={{ width: "8%" }} /><col style={{ width: "16%" }} />
+          <col style={{ width: "16%" }} /><col /><col style={{ width: "16%" }} />
+        </colgroup>
+        <thead>
+          <tr><th>번호</th><th>처리일</th><th>처리구분</th><th>내용</th><th>담당자</th></tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr><td colSpan={5} className="empty-cell">아직 처리 이력이 없습니다.</td></tr>
+          )}
+          {rows.map((row, i) => (
+            <tr key={i}>
+              <td>{i + 1}</td>
+              <td>{row.date}</td>
+              <td>{row.kind}</td>
+              <td className="cell-left">{row.text}</td>
+              <td>{nameOf(users, row.who) || "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }

@@ -32,5 +32,19 @@ export function previewDeadline(foundDate, months) {
   return toDateString(target);
 }
 
+/**
+ * 오늘부터 그 날짜까지 남은 날수. 지났으면 음수.
+ * @returns {number|null} 날짜가 없으면 null
+ */
+export function daysLeft(dateStr) {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const target = new Date(y, m - 1, d);
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target - start) / 86400000);
+}
+
 /** 기간 만료 시 조치 방법의 기본 선택지 (설정 화면에서 고른다) */
 export const EXPIRE_ACTIONS = ["관할서인계", "폐기", "계속보관"];

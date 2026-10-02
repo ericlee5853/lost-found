@@ -34,5 +34,5 @@ export function useRecordForm(initial) {
     return true;
   }
 
-  return { form, setField, error, setError, checkRequired };
+  return { form, setForm, setField, error, setError, checkRequired };
 }

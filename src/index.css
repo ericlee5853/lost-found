@@ -332,9 +332,9 @@ select.input {
 .photo-del:hover { background: var(--danger); }
 
 /* 작은 사진 줄 */
-.thumb-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.thumb-row { display: flex; gap: 6px; }
 .thumb-item {
-  width: 56px; height: 56px; padding: 0; border-radius: 8px; overflow: hidden;
+  flex: 1 1 0; min-width: 0; aspect-ratio: 1 / 1; padding: 0; border-radius: 8px; overflow: hidden;
   border: 2px solid transparent; background: var(--thumb);
   display: flex; align-items: center; justify-content: center;
 }
@@ -372,6 +372,70 @@ select.input {
 .check-inline input, .pick input { accent-color: var(--primary); }
 .pick { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
 .login-hint { margin-top: 14px; text-align: center; font-size: 13px; color: var(--text-muted); }
+
+/* ---------- 분실물 상세·접수 배치 ---------- */
+/* 윗줄: 사진 / 기본·습득 / 물품·보관 */
+.record-top { display: grid; grid-template-columns: 0.76fr 1fr 1.18fr; gap: 18px; align-items: start; }
+/* 가운뎃줄: 습득자 / 관리 */
+.record-mid { display: grid; grid-template-columns: 1.08fr 1fr; gap: 18px; align-items: start; margin-top: 18px; }
+.record-col { display: flex; flex-direction: column; gap: 18px; }
+.record-mid + .card, .record-top + .card { margin-top: 18px; }
+.card + .card { margin-top: 18px; }
+.record-col .card + .card { margin-top: 0; }
+
+/* 이름이 왼쪽에 오는 입력 줄 */
+.form-rows { display: flex; flex-direction: column; gap: 10px; }
+.form-row { display: flex; align-items: flex-start; gap: 14px; }
+.form-cell { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
+.form-label {
+  flex: 0 0 var(--label-w, 88px); padding-top: 7px;
+  font-size: 14.5px; font-weight: var(--weight-body); line-height: 1.2;
+  word-break: keep-all;
+}
+.form-control { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.form-control > .input { flex: 1; min-width: 0; }
+/* 이름이 긴 카드 (관리 정보) */
+.card.wide-label { --label-w: 150px; }
+
+/* 여러 줄 입력과 글자 수 */
+.textarea-wrap { position: relative; flex: 1; min-width: 0; }
+.textarea { height: auto; padding: 8px 14px; line-height: 1.5; resize: vertical; width: 100%; }
+.char-count { position: absolute; right: 10px; bottom: 6px; font-size: 11px; color: var(--text-muted); }
+
+/* 동그라미로 고르기 */
+.radio-group { display: flex; flex-wrap: wrap; gap: 14px; padding-top: 6px; }
+.radio-item { display: flex; align-items: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+.radio-item input { accent-color: var(--primary); }
+
+/* 보관 기간 요약 띠 */
+.storage-summary {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 12px; padding: 10px 14px; border-radius: var(--radius);
+  background: var(--sub-blue); color: var(--primary); font-size: 14px;
+}
+.storage-summary b { font-weight: var(--weight-title); }
+.summary-left { color: var(--primary); }
+.summary-note { margin-left: auto; color: var(--text-muted); font-size: 12.5px; }
+
+/* 작은 꼬리표 (자동생성 등) */
+.tagline.small { height: 24px; padding: 0 9px; font-size: 12px; white-space: nowrap; }
+
+/* 처리 이력 표 */
+.history-table th { height: 44px; font-size: 14.5px; }
+.history-table td { height: 52px; font-size: 14px; }
+
+/* 맨 아래 버튼 줄: 왼쪽 목록으로, 오른쪽 저장 */
+.bottom-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 18px;
+}
+.bottom-right { display: flex; gap: 10px; }
+.bottom-error { margin-top: 14px; text-align: right; }
+
+/* 좁은 화면에서는 한 줄로 쌓는다 */
+@media (max-width: 1180px) {
+  .record-top, .record-mid { grid-template-columns: 1fr; }
+}
 
 /* ---------- 설정값 변경 ---------- */
 .settings-note { margin: 37px 0 18px; font-size: 14px; line-height: 1.7; color: var(--text-sub); }
