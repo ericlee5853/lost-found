@@ -1,18 +1,16 @@
 // src/imageFile.js
-// 사진 파일을 올리기 전에 확인하고 줄이는 함수들.
-// 크기·형식 제한은 서버가 아니라 여기(화면)에서 안내한다.
+// 사진 파일을 확인하고, 올리기 전에 크기를 줄인다.
+// 크기·형식 제한 안내는 화면에서 한다.
 
 /**
  * 올릴 수 있는 사진 확장자.
- * 아이폰(HEIC·HEIF)과 안드로이드에서 찍은 사진 형식을 모두 포함한다.
- * 브라우저가 화면에 띄우지 못하는 형식(RAW·SVG 등)은 넣지 않는다.
+ * 아이폰(HEIC·HEIF)과 안드로이드에서 찍은 형식을 모두 넣었다.
+ * 브라우저가 띄우지 못하는 형식(RAW·SVG)은 넣지 않는다.
  */
 export const ALLOWED_IMAGE_EXTENSIONS = [
-  "jpg", "jpeg", "jpe", "jfif",   // 가장 흔한 사진
-  "png", "gif", "bmp",
-  "webp",                          // 안드로이드에서 자주 쓰는 형식
-  "heic", "heif", "hif",           // 아이폰 기본 사진 형식
-  "avif",
+  "jpg", "jpeg", "jpe", "jfif",
+  "png", "gif", "bmp", "webp",
+  "heic", "heif", "hif", "avif",
   "tif", "tiff",
 ];
 
@@ -20,14 +18,15 @@ export const ALLOWED_IMAGE_EXTENSIONS = [
 export const IMAGE_ACCEPT =
   ["image/*", ...ALLOWED_IMAGE_EXTENSIONS.map((ext) => `.${ext}`)].join(",");
 
+/** 한 건에 올릴 수 있는 사진 수 */
+export const MAX_PHOTOS = 5;
+
 /** 고를 수 있는 최대 용량 (줄이기 전 원본 기준) */
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
-/** 줄인 뒤의 긴 변 최대 길이(px)와 저장 품질 */
-const MAX_SIDE = 1280;
-const QUALITY = 0.8;
+const MAX_SIDE = 1000;   // 줄인 뒤 긴 변 길이
+const QUALITY = 0.72;
 
-/** "20MB" 처럼 읽기 쉬운 크기 문구 */
 function sizeText(bytes) {
   return bytes >= 1024 * 1024
     ? `${Math.round(bytes / (1024 * 1024))}MB`
@@ -50,12 +49,12 @@ export function checkImageFile(file) {
 }
 
 /**
- * 사진의 긴 변을 MAX_SIDE 에 맞춰 줄이고 JPEG 로 바꾼다.
- * 브라우저가 열지 못하는 형식(예: 크롬의 HEIC)이면 null 을 돌려주며,
- * 이때는 원본을 그대로 올린다.
- * @returns {Promise<File|null>}
+ * 사진을 줄여 화면에서 바로 쓸 수 있는 문자열로 바꾼다.
+ * 브라우저가 열지 못하는 형식이면 null 을 돌려준다.
+ * (서버가 붙으면 이 자리에서 파일을 올리고 경로를 받게 된다.)
+ * @returns {Promise<string|null>}
  */
-export function shrinkImage(file) {
+export function shrinkToDataUrl(file) {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -70,28 +69,18 @@ export function shrinkImage(file) {
         width = Math.round((width * MAX_SIDE) / height);
         height = MAX_SIDE;
       }
-
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => resolve(blob ? new File([blob], renameToJpg(file.name), { type: "image/jpeg" }) : null),
-        "image/jpeg",
-        QUALITY
-      );
+      resolve(canvas.toDataURL("image/jpeg", QUALITY));
     };
 
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      resolve(null); // 이 브라우저가 열지 못하는 형식
+      resolve(null);
     };
 
     img.src = url;
   });
-}
-
-/** 줄인 사진은 JPEG 이므로 확장자도 바꾼다. */
-function renameToJpg(name) {
-  return name.replace(/\.[^.]+$/, "") + ".jpg";
 }

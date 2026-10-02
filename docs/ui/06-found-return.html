@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>반환 처리</title>
+<link rel="stylesheet" href="../../node_modules/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../../src/index.css">
+<style>
+html, body { height: 100%; }
+.app { display: flex; min-height: 100%; }
+/* 왼쪽 메뉴 (메인 컬러를 어둡게 쓴 색) */
+.side { flex: 0 0 220px; background: #004567; color: #fff; padding: 22px 0 0; }
+.brand { padding: 0 22px 20px; border-bottom: 1px solid rgba(255,255,255,.16); }
+.brand b { display: block; font-size: 17px; font-weight: 600; }
+.brand span { display: block; margin-top: 4px; font-size: 13px; color: #a9c6d8; }
+.nav { padding-top: 14px; }
+.nav div { display: flex; align-items: center; gap: 10px; padding: 13px 22px; font-size: 15px; color: #cfe0ea; }
+.nav div.on { background: #006eaa; color: #fff; font-weight: 600; }
+.nav i { display: inline-block; width: 16px; height: 16px; border-radius: 4px; background: currentColor; opacity: .75; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; justify-content: flex-end; gap: 14px;
+       height: 62px; padding: 0 28px; background: #fff; border-bottom: 1px solid var(--sub-gray); }
+.who { font-size: 14px; color: var(--text-sub); }
+.content { flex: 1; padding: 26px 28px 36px; }
+.content .page-title { margin-top: 0; }
+.content .page-header { align-items: center; margin-bottom: 18px; }
+.sub { margin-left: 10px; font-size: 14px; color: var(--text-muted); font-weight: 500; }
+.req { color: #c0473f; }
+/* 사진 여러 장 */
+.photo-card { align-items: stretch; }
+.shots { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.shot { aspect-ratio: 1/1; border-radius: 8px; background: var(--thumb); }
+.shot.add { background: var(--bg-page); border: 1px dashed #c3c9d2; display: flex;
+            align-items: center; justify-content: center; color: var(--text-muted); font-size: 22px; }
+.photo-main { width: 100%; height: 210px; border-radius: var(--radius-lg); background: var(--thumb); margin-bottom: 8px; }
+/* 표 안의 작은 버튼 묶음 */
+.pick { display: inline-flex; align-items: center; gap: 6px; }
+.note-row td { background: var(--sub-blue); }
+.linkline { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.linkline b { color: var(--primary); }
+.tagline { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 13px;
+           background: var(--sub-blue); color: var(--primary); font-size: 13px; font-weight: 600; }
+
+body { min-height: 1024px; }</style></head>
+<body><div class="app"><aside class="side">
+      <div class="brand"><b>동양미래대학교</b><span>유실물 관리</span></div>
+      <div class="nav"><div class="on"><i></i>분실물 대장</div><div class=""><i></i>분실신고 대장</div><div class=""><i></i>설정값 변경</div></div></aside>
+      <div class="main"><div class="top"><span class="who">학생처 김남진 님</span>
+      <button class="btn">로그아웃</button></div><div class="content"><div class="page-header"><h1 class="page-title">반환 처리<span class="sub">물건을 돌려줄 때 수령자를 기록합니다</span></h1><div class="header-buttons"></div></div><div class="manage-no"><span class="manage-no-label">관리번호</span><span class="manage-no-value">20260001</span></div><div class="record-sections" style="max-width:900px"><section class="card"><h2 class="card-title">반환할 물건</h2><div class="field-grid cols-3"><div class="field"><label class="field-label">물품명</label><div class="input value-box">AirPods Pro</div></div><div class="field"><label class="field-label">물품 구분</label><div class="input value-box">전자기기</div></div><div class="field"><label class="field-label">보관장소</label><div class="input value-box">학생처 분실물 보관함 A-03</div></div></div></section><section class="card"><h2 class="card-title">수령자 정보</h2><div class="field-grid cols-3"><div class="field"><label class="field-label">수령자 학번</label><input class="input" placeholder="학번 또는 교직원번호"></div><div class="field"><label class="field-label">수령자 이름</label><input class="input" placeholder="이름을 입력하세요"></div><div class="field"><label class="field-label">수령일</label><input class="input" type="date" value="2026-10-02"></div></div></section><section class="card"><h2 class="card-title">확인 정보</h2><div class="field-grid cols-2"><div class="field full"><label class="field-label">확인 방법</label><input class="input" placeholder="예) 학생증 확인, 본인 진술"></div><div class="field"><label class="field-label">확인담당자</label><select class="input"><option>김남진 (학생처)</option></select></div></div></section><p class="list-count" style="font-size:14px;color:var(--text-muted);margin-left:2px">반환 처리를 하면 처리상태가 <b>본인반환</b> 으로 바뀌고 처리일에 수령일이 들어갑니다.</p></div><div class="action-bar"><button class="btn ">취소</button><button class="btn primary">반환 처리</button></div></div></div></div></body></html>

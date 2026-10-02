@@ -52,3 +52,32 @@ export function ChevronRightIcon() {
     </svg>
   );
 }
+
+/** 사진기 (사진 촬영) */
+export function CameraIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" {...base}>
+      <path d="M3 8.5A1.5 1.5 0 014.5 7h2.2l1.1-1.8h8.4L17.3 7h2.2A1.5 1.5 0 0121 8.5v9A1.5 1.5 0 0119.5 19h-15A1.5 1.5 0 013 17.5z" />
+      <circle cx="12" cy="13" r="3.4" />
+    </svg>
+  );
+}
+
+/** 위쪽 화살표 (파일 업로드) */
+export function UploadIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" {...base}>
+      <path d="M12 16V4M7 9l5-5 5 5" />
+      <path d="M4 19h16" />
+    </svg>
+  );
+}
+
+/** 휴지통 (사진 삭제) */
+export function TrashIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" {...base}>
+      <path d="M4 7h16M10 7V5h4v2M6 7l1 13h10l1-13" />
+    </svg>
+  );
+}

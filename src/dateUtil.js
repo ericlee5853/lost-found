@@ -31,3 +31,6 @@ export function previewDeadline(foundDate, months) {
   target.setDate(Math.min(d, lastDay));
   return toDateString(target);
 }
+
+/** 기간 만료 시 조치 방법의 기본 선택지 (설정 화면에서 고른다) */
+export const EXPIRE_ACTIONS = ["관할서인계", "폐기", "계속보관"];

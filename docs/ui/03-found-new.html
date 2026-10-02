@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>분실물 접수</title>
+<link rel="stylesheet" href="../../node_modules/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../../src/index.css">
+<style>
+html, body { height: 100%; }
+.app { display: flex; min-height: 100%; }
+/* 왼쪽 메뉴 (메인 컬러를 어둡게 쓴 색) */
+.side { flex: 0 0 220px; background: #004567; color: #fff; padding: 22px 0 0; }
+.brand { padding: 0 22px 20px; border-bottom: 1px solid rgba(255,255,255,.16); }
+.brand b { display: block; font-size: 17px; font-weight: 600; }
+.brand span { display: block; margin-top: 4px; font-size: 13px; color: #a9c6d8; }
+.nav { padding-top: 14px; }
+.nav div { display: flex; align-items: center; gap: 10px; padding: 13px 22px; font-size: 15px; color: #cfe0ea; }
+.nav div.on { background: #006eaa; color: #fff; font-weight: 600; }
+.nav i { display: inline-block; width: 16px; height: 16px; border-radius: 4px; background: currentColor; opacity: .75; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; justify-content: flex-end; gap: 14px;
+       height: 62px; padding: 0 28px; background: #fff; border-bottom: 1px solid var(--sub-gray); }
+.who { font-size: 14px; color: var(--text-sub); }
+.content { flex: 1; padding: 26px 28px 36px; }
+.content .page-title { margin-top: 0; }
+.content .page-header { align-items: center; margin-bottom: 18px; }
+.sub { margin-left: 10px; font-size: 14px; color: var(--text-muted); font-weight: 500; }
+.req { color: #c0473f; }
+/* 사진 여러 장 */
+.photo-card { align-items: stretch; }
+.shots { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.shot { aspect-ratio: 1/1; border-radius: 8px; background: var(--thumb); }
+.shot.add { background: var(--bg-page); border: 1px dashed #c3c9d2; display: flex;
+            align-items: center; justify-content: center; color: var(--text-muted); font-size: 22px; }
+.photo-main { width: 100%; height: 210px; border-radius: var(--radius-lg); background: var(--thumb); margin-bottom: 8px; }
+/* 표 안의 작은 버튼 묶음 */
+.pick { display: inline-flex; align-items: center; gap: 6px; }
+.note-row td { background: var(--sub-blue); }
+.linkline { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.linkline b { color: var(--primary); }
+.tagline { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 13px;
+           background: var(--sub-blue); color: var(--primary); font-size: 13px; font-weight: 600; }
+
+body { min-height: 1600px; }</style></head>
+<body><div class="app"><aside class="side">
+      <div class="brand"><b>동양미래대학교</b><span>유실물 관리</span></div>
+      <div class="nav"><div class="on"><i></i>분실물 대장</div><div class=""><i></i>분실신고 대장</div><div class=""><i></i>설정값 변경</div></div></aside>
+      <div class="main"><div class="top"><span class="who">학생처 김남진 님</span>
+      <button class="btn">로그아웃</button></div><div class="content"><div class="page-header"><h1 class="page-title">분실물 접수</h1><div class="header-buttons"></div></div><div class="manage-no"><span class="manage-no-label">관리번호</span><span class="manage-no-value">20260004</span></div><div class="record-layout"><section class="card photo-card"><h2 class="card-title">사진 등록 (최대 5장)</h2><div class="photo-main"></div><div class="shots"><div class="shot"></div><div class="shot"></div><div class="shot"></div><div class="shot add">+</div><div class="shot add">+</div></div></section><div class="record-sections"><section class="card"><h2 class="card-title">기본 정보</h2><div class="field-grid cols-3"><div class="field"><label class="field-label">접수일 <span class="req">*</span></label><input class="input" type="date" value=""></div><div class="field"><label class="field-label">접수담당자</label><div class="input value-box">김남진 (학생처)</div></div></div></section><section class="card"><h2 class="card-title">물품 정보</h2><div class="field-grid cols-2"><div class="field"><label class="field-label">물품 구분 <span class="req">*</span></label><select class="input"><option>선택하세요</option></select></div><div class="field"><label class="field-label">물품명 <span class="req">*</span></label><input class="input" placeholder="예) 신분증, 카드지갑, 텀블러"></div><div class="field full"><label class="field-label">특징</label><input class="input" placeholder="입력해주세요"></div></div></section><section class="card"><h2 class="card-title">습득 정보</h2><div class="field-grid cols-3"><div class="field"><label class="field-label">습득일 <span class="req">*</span></label><input class="input" type="date" value=""></div><div class="field"><label class="field-label">습득장소 <span class="req">*</span></label><select class="input"><option>건물 선택</option></select></div><div class="field"><label class="field-label">습득장소 상세</label><input class="input" placeholder="입력해주세요"></div></div></section><section class="card"><h2 class="card-title">보관 정보</h2><div class="field-grid cols-3"><div class="field"><label class="field-label">보관장소 <span class="req">*</span></label><select class="input"><option>보관장소 선택</option></select></div><div class="field"><label class="field-label">보관 세부</label><input class="input" placeholder="예) A-03"></div><div class="field"><label class="field-label">보관만료일</label><div class="input value-box computed"><span class=placeholder>자동 계산</span></div></div></div></section><section class="card"><h2 class="card-title">습득자 정보</h2><div class="field-grid cols-3"><div class="field"><label class="field-label">습득자 구분 <span class="req">*</span></label><select class="input"><option>선택하세요</option></select></div><div class="field"><label class="field-label">학번</label><input class="input" placeholder="학번을 입력하세요"></div><div class="field"><label class="field-label">성명</label><input class="input" placeholder="이름을 입력하세요"></div><div class="field"><label class="field-label">연락처</label><input class="input" placeholder="010-0000-0000"></div></div></section><section class="card"><h2 class="card-title">분실자 정보</h2><div class="field-grid cols-3"><div class="field"><label class="field-label">분실자</label><input class="input" placeholder="이름을 입력하세요"></div><div class="field"><label class="field-label">연락처</label><input class="input" placeholder="010-0000-0000"></div><div class="field"><label class="field-label">연락 여부</label><select class="input"><option>X</option></select></div></div></section><section class="card"><h2 class="card-title">관리 정보</h2><div class="field-grid cols-3"><div class="field"><label class="field-label">처리상태 <span class="req">*</span></label><select class="input"><option>미처리</option></select></div><div class="field"><label class="field-label">만료 시 조치 방법</label><div class="input value-box computed"><span class=placeholder>물품 구분 선택 시 표시</span></div></div><div class="field"><label class="field-label">처리일</label><div class="input value-box computed"><span class=placeholder>처리 시 입력</span></div></div><div class="field full"><label class="field-label">비고</label><input class="input" placeholder="특이사항이 있으면 입력하세요"></div></div></section></div></div><div class="action-bar"><button class="btn ">취소</button><button class="btn primary">등록</button></div></div></div></div></body></html>

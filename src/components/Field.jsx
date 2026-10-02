@@ -15,19 +15,20 @@ import { useRecordFormContext } from "../formContext";
  * @param {function} [format]   입력값을 저장 전에 다듬는 함수 (예: 전화번호 하이픈)
  * @param {string} [value]      computed 타입에서 보여줄 값
  * @param {boolean} [full]      한 줄 전체 너비를 쓸지 여부
+ * @param {boolean} [required]  필수 입력이면 이름 옆에 * 를 붙인다
  * @param {boolean} [disabled]  아직 쓸 수 없는 항목이면 입력을 막는다
  * @param {string} [inputMode]  모바일 키패드 종류
  */
 export default function Field({
   label, name, type = "text", options = [], placeholder,
-  numeric, format, value, full, disabled, inputMode,
+  numeric, format, value, full, required, disabled, inputMode,
 }) {
   const { form, setField, readOnly } = useRecordFormContext();
   const current = type === "computed" ? value : form[name];
 
   return (
     <div className={"field" + (full ? " full" : "")}>
-      <label className="field-label">{label}</label>
+      <label className="field-label">{label}{required && <span className="required-mark">*</span>}</label>
       {readOnly || type === "computed" || disabled
         ? <ValueBox type={type === "text" && disabled ? "computed" : type}
             text={displayText(type, current, options)}
