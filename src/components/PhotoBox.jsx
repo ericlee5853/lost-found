@@ -4,11 +4,13 @@
 // 접수·수정 화면에서는 사진 촬영과 파일 업로드로 사진을 더할 수 있다.
 
 import { useState } from "react";
-import { IMAGE_ACCEPT, MAX_PHOTOS, checkImageFile, shrinkToDataUrl } from "../imageFile";
+import { IMAGE_ACCEPT, MAX_PHOTOS, checkImageFile, shrinkImage } from "../imageFile";
+import { uploadImage } from "../data/uploads";
+import { imageUrl, toMessage } from "../api/client";
 import { CameraIcon, CameraPlusIcon, UploadIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon } from "./icons";
 
 /**
- * @param {string[]} photos    사진 목록 (지금은 그림 데이터, 서버 연동 뒤에는 주소)
+ * @param {string[]} photos    사진 경로 목록 (예: /uploads/2026/10/a1b2.jpg)
  * @param {function} [onChange] 사진 목록이 바뀌었을 때. 없으면 보기 전용
  */
 export default function PhotoBox({ photos = [], onChange }) {
@@ -34,12 +36,15 @@ export default function PhotoBox({ photos = [], onChange }) {
     for (const file of files) {
       const problem = checkImageFile(file);
       if (problem) { setMessage(problem); continue; }
-      const shrunk = await shrinkToDataUrl(file);
-      if (!shrunk) {
-        setMessage("이 형식은 이 브라우저에서 열 수 없습니다. 다른 사진을 올려 주세요.");
-        continue;
+      try {
+        // 보내는 양을 줄이려고 먼저 크기를 줄인다.
+        // 브라우저가 열지 못하는 형식이면 원본을 그대로 올린다.
+        const shrunk = await shrinkImage(file);
+        added.push(await uploadImage(shrunk ?? file));
+        if (!shrunk) setMessage("이 형식은 브라우저에 따라 미리보기가 보이지 않을 수 있습니다.");
+      } catch (err) {
+        setMessage(toMessage(err, "사진을 올리지 못했습니다."));
       }
-      added.push(shrunk);
     }
     if (added.length > 0) {
       onChange([...photos, ...added]);
@@ -78,7 +83,7 @@ export default function PhotoBox({ photos = [], onChange }) {
           <span className="photo-empty">{busy ? "사진 넣는 중..." : "등록된 사진이 없습니다"}</span>
         ) : (
           <>
-            <img src={photos[current]} alt={`물품 사진 ${current + 1}`} />
+            <img src={imageUrl(photos[current])} alt={`물품 사진 ${current + 1}`} />
             {count > 1 && (
               <>
                 <button type="button" className="photo-nav left" onClick={() => move(-1)}
@@ -101,7 +106,7 @@ export default function PhotoBox({ photos = [], onChange }) {
         {photos.map((src, i) => (
           <button type="button" key={i} onClick={() => setIndex(i)}
             className={"thumb-item" + (i === current ? " on" : "")} aria-label={`${i + 1}번째 사진 보기`}>
-            <img src={src} alt="" />
+            <img src={imageUrl(src)} alt="" />
           </button>
         ))}
         {editable && Array.from({ length: MAX_PHOTOS - count }).map((_, i) => (

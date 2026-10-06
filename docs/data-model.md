@@ -41,6 +41,17 @@
 | `storage_months` | 필수 | 보관 개월. 보관만료일 계산에 쓴다 |
 | `expire_action` | | 만료 시 조치 방법의 기본값 |
 
+`process_result` 와 `report_status` 에는 `code` 칸이 있다.
+
+| 칸 | 필수 | 설명 |
+| --- | --- | --- |
+| `code` | | 화면이 뜻을 알아보는 열쇠. 같은 설정 안에서 중복 불가 |
+
+관리자가 이름을 바꿔도 화면이 뜻을 잃지 않도록, 이름이 아니라 이 값으로 판단한다.
+분실물은 `STORED`(보관중) · `RETURNED`(반환) · `DISCARDED` · `TRANSFERRED`,
+분실신고는 `OPEN`(미처리) · `DONE`(처리완료) · `CANCELED` 를 넣는다.
+관리자가 새로 만든 항목은 비어 있다.
+
 ### 다루는 규칙 세 가지
 
 1. **이름이 아니라 번호로 저장한다.** 대장에는 "전자기기" 대신 `category_id` 번호가 들어간다.
@@ -227,14 +238,7 @@
 
 ### 새 API
 
-| 하는 일 | 주소 |
-| --- | --- |
-| 건물 설정 | `/things/buildings` |
-| 보관장소 설정 | `/things/storage-places` |
-| 분실물 사진 목록·추가·삭제 | `/things/lost-items/{manage_no}/images` |
-
-사진 올리기(`POST /things/uploads`)는 파일을 저장하고 경로를 돌려주는 역할만 한다.
-그 경로를 사진 표에 연결하는 일은 위 주소가 맡는다.
+주소와 주고받는 모양은 [백엔드 API 규칙](api-spec.md) 에 모두 적어 두었다.
 
 ## 7. 헷갈리기 쉬운 점
 

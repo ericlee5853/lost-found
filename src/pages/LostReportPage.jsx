@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { reportApi, foundApi, unmatchReport } from "../data/records";
-import { useReference, nameOf, selectOptions } from "../referenceContext";
+import { useReference, nameOf, selectOptions, byCode } from "../referenceContext";
+import { useAsync } from "../useAsync";
+import { toMessage } from "../api/client";
+import { LoadingBox, ErrorBox } from "../components/StatusBox";
 import { FINDER_TYPES, toOptions } from "../constants";
 import { formatPhone } from "../formatUtil";
 import { today } from "../dateUtil";
@@ -41,47 +44,88 @@ const REQUIRED = [
 export default function LostReportPage({ mode }) {
   const navigate = useNavigate();
   const { manageNo } = useParams();
-  const ref = useReference();
   const isNew = !manageNo;
+
+  // 기존 건이면 그 한 건과 연결된 분실물을, 새 건이면 미리 보여줄 관리번호를 받아온다.
+  const { data, loading, error, reload } = useAsync(async () => {
+    if (isNew) return { newNo: await reportApi.nextManageNo().catch(() => ""), saved: null, matched: null };
+    const saved = await reportApi.get(manageNo);
+    const matched = saved.matchedFoundId
+      ? await foundApi.list().then((rows) => rows.find((it) => it.id === Number(saved.matchedFoundId)) ?? null)
+      : null;
+    return { newNo: "", saved, matched };
+  }, [manageNo]);
+
+  if (loading) return <LoadingBox />;
+  if (error) {
+    return (
+      <ErrorBox message={error} onRetry={reload}>
+        <button className="btn" onClick={() => navigate("/lost")}>목록으로</button>
+      </ErrorBox>
+    );
+  }
+
+  return <LostReportForm mode={mode} manageNo={manageNo} {...data} />;
+}
+
+function LostReportForm({ mode, manageNo, saved, newNo, matched }) {
+  const navigate = useNavigate();
+  const ref = useReference();
+  const [sending, setSending] = useState(false);
+  const isNew = !saved;
   const readOnly = mode === "view";
 
-  const saved = isNew ? null : reportApi.get(manageNo);
-  const openStatusId = ref.statuses.find((s) => s.name.includes("미처리"))?.id ?? ref.statuses[0]?.id ?? "";
-  const [newNo] = useState(() => (isNew ? reportApi.nextManageNo() : ""));
+  // 처리상태는 이름이 아니라 code 로 찾는다.
+  const openStatusId = byCode(ref.statuses, "OPEN", "미처리")?.id ?? ref.statuses[0]?.id ?? "";
 
   const recordForm = useRecordForm(() => saved ?? emptyForm(newNo, ref.me.id, openStatusId));
-  const { form, error, checkRequired } = recordForm;
+  const { form, error, setError, checkRequired } = recordForm;
 
   if (!isNew && !saved) return <NotFoundBox manageNo={manageNo} backTo="/lost" />;
 
   const numberLabel = form.reporterType === "교직원" ? "교직원번호" : "학번";
   const needNumber = form.reporterType === "학생" || form.reporterType === "교직원";
-  const matched = form.matchedFoundId
-    ? foundApi.list().find((it) => it.id === Number(form.matchedFoundId))
-    : null;
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (!checkRequired(REQUIRED)) return;
-    if (isNew) {
-      const created = reportApi.create(form);
-      navigate(`/lost/${created.manageNo}`, { replace: true });
-    } else {
-      reportApi.update(manageNo, form);
-      navigate(`/lost/${manageNo}`, { replace: true });
+    if (sending || !checkRequired(REQUIRED)) return;
+    setSending(true);
+    try {
+      if (isNew) {
+        const created = await reportApi.create(form);
+        navigate(`/lost/${created.manageNo}`, { replace: true });
+      } else {
+        await reportApi.update(manageNo, saved, form);
+        navigate(`/lost/${manageNo}`, { replace: true });
+      }
+    } catch (err) {
+      setError(toMessage(err, "저장하지 못했습니다."));
+      setSending(false);
     }
   }
 
-  function handleDelete() {
-    if (!window.confirm(`관리번호 ${manageNo} 건을 지우시겠습니까?`)) return;
-    reportApi.remove(manageNo);
-    navigate("/lost", { replace: true });
+  async function handleDelete() {
+    if (!window.confirm(`관리번호 ${manageNo} 건을 지우시겠습니까?\n서버에서 완전히 지워집니다.`)) return;
+    setSending(true);
+    try {
+      await reportApi.remove(manageNo);
+      navigate("/lost", { replace: true });
+    } catch (err) {
+      setError(toMessage(err, "삭제하지 못했습니다."));
+      setSending(false);
+    }
   }
 
-  function handleUnmatch() {
+  async function handleUnmatch() {
     if (!window.confirm("연결을 푸시겠습니까?")) return;
-    unmatchReport(manageNo, openStatusId);
-    navigate(0);
+    setSending(true);
+    try {
+      await unmatchReport(manageNo, openStatusId);
+      navigate(0);
+    } catch (err) {
+      setError(toMessage(err, "연결을 풀지 못했습니다."));
+      setSending(false);
+    }
   }
 
   const title = readOnly ? "분실 신고 상세" : isNew ? "분실 신고" : "분실 신고 수정";
@@ -166,8 +210,10 @@ export default function LostReportPage({ mode }) {
               <>
                 <button type="button" className="btn"
                   onClick={() => navigate(isNew ? "/lost" : `/lost/${manageNo}`)}>취소</button>
-                {!isNew && <button type="button" className="btn danger" onClick={handleDelete}>삭제</button>}
-                <button type="submit" className="btn primary">{isNew ? "등록" : "저장"}</button>
+                {!isNew && <button type="button" className="btn danger" disabled={sending} onClick={handleDelete}>삭제</button>}
+                <button type="submit" className="btn primary" disabled={sending}>
+                  {sending ? "저장 중..." : isNew ? "등록" : "저장"}
+                </button>
               </>
             )}
           </ActionBar>

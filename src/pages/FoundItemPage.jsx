@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { foundApi } from "../data/records";
-import { useReference, nameOf, selectOptions } from "../referenceContext";
+import { toMessage } from "../api/client";
+import { useReference, nameOf, selectOptions, byCode } from "../referenceContext";
+import { useAsync } from "../useAsync";
+import { LoadingBox, ErrorBox } from "../components/StatusBox";
 import { CONTACTED_OPTIONS, FINDER_TYPES, toOptions } from "../constants";
 import { formatPhone } from "../formatUtil";
 import { today, previewDeadline, daysLeft } from "../dateUtil";
@@ -49,13 +52,37 @@ const REQUIRED = [
 export default function FoundItemPage({ mode }) {
   const navigate = useNavigate();
   const { manageNo } = useParams();
-  const ref = useReference();
   const isNew = !manageNo;
+
+  // 기존 건이면 그 한 건을, 새 건이면 미리 보여줄 관리번호를 받아온다.
+  // 관리번호는 저장할 때 서버가 정하므로, 못 받아와도 화면은 열린다.
+  const { data, loading, error, reload } = useAsync(
+    () => (isNew ? foundApi.nextManageNo().catch(() => "") : foundApi.get(manageNo)),
+    [manageNo]
+  );
+
+  if (loading) return <LoadingBox />;
+  if (error) {
+    return (
+      <ErrorBox message={error} onRetry={reload}>
+        <button className="btn" onClick={() => navigate("/found")}>목록으로</button>
+      </ErrorBox>
+    );
+  }
+
+  return <FoundItemForm mode={mode} manageNo={manageNo}
+    saved={isNew ? null : data} newNo={isNew ? data : ""} />;
+}
+
+function FoundItemForm({ mode, manageNo, saved, newNo }) {
+  const navigate = useNavigate();
+  const ref = useReference();
+  const [sending, setSending] = useState(false);
+  const isNew = !saved;
   const readOnly = mode === "view";
 
-  const saved = isNew ? null : foundApi.get(manageNo);
-  const keepStatusId = ref.results.find((r) => r.name.includes("보관"))?.id ?? ref.results[0]?.id ?? "";
-  const [newNo] = useState(() => (isNew ? foundApi.nextManageNo() : ""));
+  // 처리상태는 이름이 아니라 code 로 찾는다. 관리자가 이름을 바꿔도 흔들리지 않는다.
+  const keepStatusId = byCode(ref.results, "STORED", "보관")?.id ?? ref.results[0]?.id ?? "";
   const blank = () => emptyForm(newNo, ref.me.id, keepStatusId);
 
   const recordForm = useRecordForm(() => saved ?? blank());
@@ -75,20 +102,21 @@ export default function FoundItemPage({ mode }) {
   const needNumber = form.finderType === "학생" || form.finderType === "교직원";
   const returned = Boolean(form.returnDate);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (!checkRequired(REQUIRED)) return;
-    const data = { ...form, deadline, expireAction };
+    if (sending || !checkRequired(REQUIRED)) return;
+    setSending(true);
     try {
       if (isNew) {
-        const created = foundApi.create(data);
+        const created = await foundApi.create(form);
         navigate(`/found/${created.manageNo}`, { replace: true });
       } else {
-        foundApi.update(manageNo, data);
+        await foundApi.update(manageNo, saved, form);
         navigate(`/found/${manageNo}`, { replace: true });
       }
     } catch (err) {
-      setError(err.message);
+      setError(toMessage(err, "저장하지 못했습니다."));
+      setSending(false);
     }
   }
 
@@ -98,10 +126,16 @@ export default function FoundItemPage({ mode }) {
     setError("");
   }
 
-  function handleDelete() {
-    if (!window.confirm(`관리번호 ${manageNo} 건을 지우시겠습니까?`)) return;
-    foundApi.remove(manageNo);
-    navigate("/found", { replace: true });
+  async function handleDelete() {
+    if (!window.confirm(`관리번호 ${manageNo} 건을 지우시겠습니까?\n서버에서 완전히 지워집니다.`)) return;
+    setSending(true);
+    try {
+      await foundApi.remove(manageNo);
+      navigate("/found", { replace: true });
+    } catch (err) {
+      setError(toMessage(err, "삭제하지 못했습니다."));
+      setSending(false);
+    }
   }
 
   const title = readOnly ? "분실물 상세" : isNew ? "분실물 접수" : "분실물 수정";
@@ -303,14 +337,18 @@ export default function FoundItemPage({ mode }) {
               ) : isNew ? (
                 <>
                   <button type="button" className="btn" onClick={handleReset}>초기화</button>
-                  <button type="submit" className="btn primary">접수 등록</button>
+                  <button type="submit" className="btn primary" disabled={sending}>
+                    {sending ? "저장 중..." : "접수 등록"}
+                  </button>
                 </>
               ) : (
                 <>
-                  <button type="button" className="btn danger" onClick={handleDelete}>삭제</button>
+                  <button type="button" className="btn danger" disabled={sending} onClick={handleDelete}>삭제</button>
                   <button type="button" className="btn"
                     onClick={() => navigate(`/found/${manageNo}`)}>취소</button>
-                  <button type="submit" className="btn primary">저장</button>
+                  <button type="submit" className="btn primary" disabled={sending}>
+                    {sending ? "저장 중..." : "저장"}
+                  </button>
                 </>
               )}
             </div>

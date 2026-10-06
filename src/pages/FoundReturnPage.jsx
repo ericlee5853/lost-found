@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { foundApi } from "../data/records";
-import { useReference, nameOf, selectOptions } from "../referenceContext";
+import { useReference, nameOf, selectOptions, byCode } from "../referenceContext";
+import { useAsync } from "../useAsync";
+import { toMessage } from "../api/client";
+import { LoadingBox, ErrorBox } from "../components/StatusBox";
 import { today } from "../dateUtil";
 import { useRecordForm } from "../useRecordForm";
 import { RecordFormContext } from "../formContext";
@@ -25,9 +28,25 @@ const REQUIRED = [
 export default function FoundReturnPage() {
   const navigate = useNavigate();
   const { manageNo } = useParams();
+  const { data, loading, error, reload } = useAsync(() => foundApi.get(manageNo), [manageNo]);
+
+  if (loading) return <LoadingBox />;
+  if (error) {
+    return (
+      <ErrorBox message={error} onRetry={reload}>
+        <button className="btn" onClick={() => navigate("/found")}>목록으로</button>
+      </ErrorBox>
+    );
+  }
+  return <ReturnForm manageNo={manageNo} saved={data} />;
+}
+
+function ReturnForm({ manageNo, saved }) {
+  const navigate = useNavigate();
   const ref = useReference();
-  const saved = foundApi.get(manageNo);
-  const [done] = useState(() => ref.results.find((r) => r.name.includes("반환")));
+  const [sending, setSending] = useState(false);
+  // 반환 상태는 이름이 아니라 code 로 찾는다.
+  const done = byCode(ref.results, "RETURNED", "반환");
 
   const recordForm = useRecordForm(() => ({
     receiverNo: saved?.receiverNo ?? "",
@@ -36,19 +55,26 @@ export default function FoundReturnPage() {
     verifyMethod: saved?.verifyMethod ?? "",
     verifyCheckerId: saved?.verifyCheckerId || ref.me.id,
   }));
-  const { form, error, checkRequired } = recordForm;
+  const { form, error, setError, checkRequired } = recordForm;
 
   if (!saved) return <NotFoundBox manageNo={manageNo} backTo="/found" />;
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (!checkRequired(REQUIRED)) return;
-    foundApi.update(manageNo, {
-      ...form,
-      resultId: done?.id ?? saved.resultId,
-      processedDate: form.returnDate,
-    });
-    navigate(`/found/${manageNo}`, { replace: true });
+    if (sending || !checkRequired(REQUIRED)) return;
+    setSending(true);
+    try {
+      // 반환 정보와 함께 처리상태·처리일을 한 번에 보낸다.
+      await foundApi.update(manageNo, saved, {
+        ...saved, ...form,
+        resultId: done?.id ?? saved.resultId,
+        processedDate: form.returnDate,
+      });
+      navigate(`/found/${manageNo}`, { replace: true });
+    } catch (err) {
+      setError(toMessage(err, "반환 처리를 저장하지 못했습니다."));
+      setSending(false);
+    }
   }
 
   return (
@@ -92,7 +118,9 @@ export default function FoundReturnPage() {
           <ActionBar message={error}>
             <button type="button" className="btn"
               onClick={() => navigate(`/found/${manageNo}`)}>취소</button>
-            <button type="submit" className="btn primary">반환 처리</button>
+            <button type="submit" className="btn primary" disabled={sending}>
+              {sending ? "저장 중..." : "반환 처리"}
+            </button>
           </ActionBar>
         </form>
       </RecordFormContext.Provider>

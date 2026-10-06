@@ -2,9 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { foundApi } from "../data/records";
+import { imageUrl } from "../api/client";
 import { useReference, nameOf, filterOptions } from "../referenceContext";
 import { useStickyState } from "../useStickyState";
 import { today } from "../dateUtil";
+import { useAsync } from "../useAsync";
+import { LoadingBox, ErrorBox } from "../components/StatusBox";
 import PageHeader from "../components/PageHeader";
 import Pagination from "../components/Pagination";
 import StatusPill from "../components/StatusPill";
@@ -41,8 +44,10 @@ export default function FoundListPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
 
+  const { data, loading, error, reload } = useAsync(() => foundApi.list(), []);
+
   /** 번호로 저장된 값에 이름을 붙여 둔다. */
-  const rows = foundApi.list().map((it) => ({
+  const rows = (data ?? []).map((it) => ({
     ...it,
     categoryName: nameOf(ref.categories, it.categoryId),
     resultName: nameOf(ref.results, it.resultId),
@@ -82,6 +87,9 @@ export default function FoundListPage() {
     XLSX.writeFile(book, `분실물관리대장_${today()}.xlsx`);
   }
 
+  if (loading) return <LoadingBox message="분실물 대장을 불러오는 중입니다..." />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+
   return (
     <>
       <PageHeader title="분실물 대장" sub="습득한 물건을 등록하고 관리합니다">
@@ -117,7 +125,7 @@ export default function FoundListPage() {
               <tr key={it.manageNo} className="clickable" onClick={() => navigate(`/found/${it.manageNo}`)}>
                 <td>{it.manageNo}</td>
                 <td>
-                  <div className="thumb">{it.images?.[0] && <img src={it.images[0]} alt="" />}</div>
+                  <div className="thumb">{it.images?.[0] && <img src={imageUrl(it.images[0])} alt="" />}</div>
                 </td>
                 <td className="cell-left">
                   <div className="item-name">{orDash(it.itemName)}</div>

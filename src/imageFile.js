@@ -49,12 +49,12 @@ export function checkImageFile(file) {
 }
 
 /**
- * 사진을 줄여 화면에서 바로 쓸 수 있는 문자열로 바꾼다.
- * 브라우저가 열지 못하는 형식이면 null 을 돌려준다.
- * (서버가 붙으면 이 자리에서 파일을 올리고 경로를 받게 된다.)
- * @returns {Promise<string|null>}
+ * 사진을 줄여 올릴 파일로 바꾼다.
+ * 브라우저가 열지 못하는 형식(예: 크롬의 HEIC)이면 null 을 돌려주며,
+ * 그때는 원본을 그대로 올린다.
+ * @returns {Promise<File|null>}
  */
-export function shrinkToDataUrl(file) {
+export function shrinkImage(file) {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -73,7 +73,11 @@ export function shrinkToDataUrl(file) {
       canvas.width = width;
       canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", QUALITY));
+      canvas.toBlob(
+        (blob) => resolve(blob ? new File([blob], toJpgName(file.name), { type: "image/jpeg" }) : null),
+        "image/jpeg",
+        QUALITY
+      );
     };
 
     img.onerror = () => {
@@ -83,4 +87,9 @@ export function shrinkToDataUrl(file) {
 
     img.src = url;
   });
+}
+
+/** 줄인 사진은 JPEG 이므로 확장자도 바꾼다. */
+function toJpgName(name) {
+  return name.replace(/\.[^.]+$/, "") + ".jpg";
 }

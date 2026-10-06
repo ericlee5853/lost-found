@@ -1,20 +1,30 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../data/auth";
+import { toMessage } from "../api/client";
 
 export default function LoginPage() {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
   const navigate = useNavigate();
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    if (sending) return;
+    setSending(true);
+    setError("");
     try {
-      login(loginId, password);
+      await login(loginId, password);
       navigate("/found", { replace: true });
     } catch (err) {
-      setError(err.message);
+      // 아이디나 비밀번호가 틀리면 서버가 401 을 준다.
+      setError(err?.response?.status === 401
+        ? "아이디 또는 비밀번호가 올바르지 않습니다."
+        : err?.response ? toMessage(err, "로그인하지 못했습니다.") : err.message);
+    } finally {
+      setSending(false);
     }
   }
 
@@ -28,9 +38,10 @@ export default function LoginPage() {
           <input className="login-input" type="password" placeholder="비밀번호" autoComplete="current-password"
             value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
-        <button type="submit" className="login-btn">로그인</button>
+        <button type="submit" className="login-btn" disabled={sending}>
+          {sending ? "로그인 중..." : "로그인"}
+        </button>
         {error && <p className="form-error">{error}</p>}
-        <p className="login-hint">화면 확인용입니다. 아이디와 비밀번호를 적으면 들어갑니다.</p>
       </form>
     </div>
   );

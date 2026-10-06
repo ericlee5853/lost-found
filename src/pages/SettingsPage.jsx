@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SETTING_APIS } from "../data/settings";
-import { reset } from "../data/db";
+import { toMessage } from "../api/client";
 import { useReference } from "../referenceContext";
 import { EXPIRE_ACTIONS } from "../dateUtil";
 import PageHeader from "../components/PageHeader";
@@ -37,11 +37,6 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const ref = useReference();
 
-  function handleReset() {
-    if (!window.confirm("지금까지 넣은 자료를 지우고 처음 보기 자료로 되돌립니다. 계속할까요?")) return;
-    reset();
-    navigate(0);
-  }
 
   return (
     <>
@@ -61,14 +56,6 @@ export default function SettingsPage() {
           api={SETTING_APIS[table.key]} onChanged={ref.reload} />
       ))}
 
-      {/* 화면 확인 단계에서만 쓰는 버튼. 서버가 붙으면 없앤다. */}
-      <section className="card settings-section demo-reset">
-        <h2 className="card-title">화면 확인용</h2>
-        <p className="hint-line">
-          지금은 자료가 이 브라우저에만 저장됩니다. 이것저것 눌러 본 뒤 처음 상태로 되돌릴 수 있습니다.
-        </p>
-        <button className="btn danger" onClick={handleReset}>보기 자료로 되돌리기</button>
-      </section>
     </>
   );
 }
@@ -94,6 +81,7 @@ function SettingTable({ title, rows, columns, blank, api, onChanged }) {
   const [drafts, setDrafts] = useState({});
   const [newRow, setNewRow] = useState(blank);
   const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState(null); // 서버에 보내는 중인 줄
 
   const valueOf = (row, key) => drafts[row.id]?.[key] ?? row[key];
 
@@ -117,37 +105,49 @@ function SettingTable({ title, rows, columns, blank, api, onChanged }) {
     return "";
   }
 
+  /** 서버 호출을 감싸 오류 문구와 진행 표시를 처리한다. */
+  async function run(id, action, fallback) {
+    setBusyId(id);
+    setError("");
+    try {
+      await action();
+      await onChanged();
+    } catch (err) {
+      setError(toMessage(err, fallback));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function saveRow(row) {
     const data = clean({ ...row, ...drafts[row.id] });
     const message = check(data.name, row.id);
     if (message) return setError(message);
-    api.update(row.id, data);
-    setDrafts((prev) => {
-      const next = { ...prev };
-      delete next[row.id];
-      return next;
-    });
-    setError("");
-    onChanged();
+    run(row.id, async () => {
+      await api.update(row.id, data);
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
+    }, "저장하지 못했습니다.");
   }
 
   function addRow() {
     const data = clean(newRow);
     const message = check(data.name, null);
     if (message) return setError(message);
-    api.create(data);
-    setNewRow(blank);
-    setError("");
-    onChanged();
+    run("new", async () => {
+      await api.create(data);
+      setNewRow(blank);
+    }, "추가하지 못했습니다.");
   }
 
   function toggleActive(row) {
     if (row.is_active && !window.confirm(
       `"${row.name}" 을(를) 사용중지하시겠습니까?\n새로 등록할 때 목록에서 빠지며, 기존 자료는 그대로 남습니다.`
     )) return;
-    api.setActive(row.id, !row.is_active);
-    setError("");
-    onChanged();
+    run(row.id, () => api.setActive(row.id, !row.is_active), "상태를 바꾸지 못했습니다.");
   }
 
   return (
@@ -175,8 +175,10 @@ function SettingTable({ title, rows, columns, blank, api, onChanged }) {
               <td>{row.is_active ? "사용중" : "사용중지"}</td>
               <td>
                 <div className="settings-actions">
-                  <button className="btn small primary" onClick={() => saveRow(row)}>저장</button>
-                  <button className="btn small" onClick={() => toggleActive(row)}>
+                  <button className="btn small primary" disabled={busyId === row.id}
+                    onClick={() => saveRow(row)}>저장</button>
+                  <button className="btn small" disabled={busyId === row.id}
+                    onClick={() => toggleActive(row)}>
                     {row.is_active ? "사용중지" : "사용재개"}
                   </button>
                 </div>
@@ -195,7 +197,7 @@ function SettingTable({ title, rows, columns, blank, api, onChanged }) {
             <td>-</td>
             <td>
               <div className="settings-actions">
-                <button className="btn small primary" onClick={addRow}>추가</button>
+                <button className="btn small primary" disabled={busyId === "new"} onClick={addRow}>추가</button>
               </div>
             </td>
           </tr>

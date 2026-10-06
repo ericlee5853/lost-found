@@ -1,11 +1,9 @@
 # 유실물 관리 프로그램
 
 교내 분실물(습득물)과 분실신고를 접수·조회·처리하는 관리 프로그램.
-React + Vite 로 만들었다.
+React + Vite 로 만들었고, 모든 자료는 백엔드 API 서버에서 가져온다.
 
-**지금은 화면만 확인하는 단계다.** 자료는 서버가 아니라 보고 있는 브라우저에 저장되며,
-새로고침해도 남지만 다른 기기와는 공유되지 않는다. 설정값 변경 화면 맨 아래에서
-처음 보기 자료로 되돌릴 수 있다. 백엔드가 준비되면 `src/data/` 폴더만 바꿔 서버와 잇는다.
+백엔드가 지켜야 할 규칙은 [docs/api-spec.md](docs/api-spec.md) 에 있다.
 
 ## 실행
 
@@ -18,25 +16,57 @@ npm run lint    # 문법 검사
 
 ### 올리는 곳
 
-Vercel 에 그대로 올리면 된다. 들어오는 설정은 `vercel.json` 에 있고, 어떤 주소로 들어와도
-화면이 열리도록 해 둔다.
+화면과 API 를 학교 서버의 같은 경로(`https://campuslife.dongyang.ac.kr/founder/`)에 둔다.
+`npm run build` 결과(`dist/`)를 그 경로에 올린다.
 
-| 명령 | 하는 일 |
+| 주소 | 받는 곳 |
 | --- | --- |
-| `npm run dev` | 개발 서버. `http://localhost:5173` |
-| `npm run build` | 올릴 파일 만들기 (`dist/`) |
+| `/founder/auth/...`, `/founder/things/...`, `/founder/health` | 백엔드 |
+| `/founder/uploads/...` | 올린 사진 파일 |
+| 그 밖의 `/founder/...` | 화면 (`index.html`) |
 
-나중에 학교 서버의 `/founder/` 아래로 옮길 때는 `.env` 에 아래 한 줄만 넣는다.
+웹서버는 위 경로만 백엔드로 넘기고, 나머지 `/founder/` 주소는 모두 `index.html` 을
+돌려줘야 한다. 그래야 `/founder/found/20260001` 에서 새로고침해도 화면이 열린다.
+nginx 예시다. `proxy_pass` 끝에 경로를 붙여야 `/founder` 가 떨어진다.
+
+```nginx
+location ^~ /founder/auth/    { proxy_pass http://127.0.0.1:8000/auth/; }
+location ^~ /founder/things/  { proxy_pass http://127.0.0.1:8000/things/; }
+location ^~ /founder/uploads/ { proxy_pass http://127.0.0.1:8000/uploads/; }
+location = /founder/health    { proxy_pass http://127.0.0.1:8000/health; }
+location /founder/ {
+    alias /var/www/lost-found/;      # dist 를 올린 곳
+    try_files $uri $uri/ /founder/index.html;
+}
+```
+
+### 환경변수
+
+`.env.example` 을 `.env` 로 복사해 쓴다. 기본값만으로도 동작한다.
+
+| 이름 | 뜻 | 기본값 |
+| --- | --- | --- |
+| `VITE_BASE_PATH` | 화면을 올릴 경로 | `/founder/` |
+| `VITE_API_BASE_URL` | API 주소. 비우면 화면과 같은 경로 | (비움) |
+| `VITE_DEV_API_TARGET` | 개발 서버가 API 요청을 넘겨줄 서버 | 운영 서버 |
+| `VITE_DEV_API_STRIP_BASE` | 넘길 때 앞의 `/founder` 를 뗄지 | `false` |
+
+개발할 때는 `npm run dev` 로 띄운 뒤 `http://localhost:5173/founder/` 로 연다.
+API 요청은 개발 서버가 넘겨주므로 주소가 같아 보이고 CORS 문제가 없다.
+
+백엔드를 직접 띄워(예: `http://localhost:8000`) 붙일 때는 `.env` 에 아래 두 줄을 넣는다.
+그 서버에는 `/founder` 경로가 없어서 떼고 넘겨야 하기 때문이다.
 
 ```
-VITE_BASE_PATH=/founder/
+VITE_DEV_API_TARGET=http://localhost:8000
+VITE_DEV_API_STRIP_BASE=true
 ```
 
 ### 로그인
 
-화면 확인 단계라 아이디와 비밀번호를 적으면 들어간다.
-백엔드가 붙으면 이 자리에서 토큰을 받아 저장하고, 토큰이 없거나 만료되면
-로그인 화면으로 보내도록 바꾼다.
+계정은 백엔드에서 발급받는다. 로그인에 성공하면 받은 토큰(JWT)을 브라우저에 저장하고,
+이후 모든 요청의 `Authorization: Bearer` 헤더에 자동으로 붙인다.
+토큰이 없거나 만료되면(401) 토큰을 지우고 로그인 화면으로 보낸다.
 
 ## 화면
 
@@ -57,20 +87,21 @@ VITE_BASE_PATH=/founder/
 
 버튼을 누르면 어디로 가는지는 [docs/screen-flow.md](docs/screen-flow.md) 에 있다.
 
-## 앞으로 서버와 잇기
+## 서버 연동
 
-화면이 쓰는 자료는 모두 `src/data/` 를 거친다. 서버가 준비되면 이 폴더의 함수 속을
-API 호출로 바꾸면 되고, 화면 코드는 고치지 않아도 된다.
+화면이 쓰는 자료는 모두 `src/data/` 를 거친다. 그 아래에서 `src/api/` 가 실제 호출을 맡는다.
 
 | 파일 | 맡은 일 |
 | --- | --- |
-| `data/db.js` | 자료를 브라우저에 담아 두고 보기 자료를 넣는다 |
-| `data/settings.js` | 설정 다섯 가지의 조회·추가·수정·사용중지 |
-| `data/records.js` | 두 대장의 조회·등록·수정·삭제, 관리번호 매기기, 연결 |
-| `data/auth.js` | 로그인 상태 |
+| `api/client.js` | 주소·토큰·오류 문구·목록 응답 모양 맞추기 |
+| `api/mappers.js` | 서버(snake_case) ↔ 화면(camelCase) 칸 이름 변환 |
+| `data/auth.js` | 로그인 · 내 정보 · 담당자 목록 |
+| `data/settings.js` | 설정 다섯 가지 |
+| `data/records.js` | 두 대장과 연결 |
+| `data/uploads.js` | 사진 올리기 |
 
-표와 칸, 서버에 필요한 것은 [docs/data-model.md](docs/data-model.md) 에 정리했다.
-사진 업로드 API 코드는 `backend/` 에 있다.
+주고받는 규격은 [docs/api-spec.md](docs/api-spec.md), 표와 칸은
+[docs/data-model.md](docs/data-model.md) 에 있다.
 
 ### 설정값을 다루는 세 가지 규칙
 
@@ -87,7 +118,7 @@ API 호출로 바꾸면 되고, 화면 코드는 고치지 않아도 된다.
 
 - 올릴 수 있는 형식: jpg, jpeg, jpe, jfif, png, gif, bmp, webp, heic, heif, hif, avif, tif, tiff
 - 최대 용량: 원본 20MB. 넣기 전에 긴 변을 1000px 로 줄인다
-- 지금은 사진도 브라우저에 담긴다. 서버가 붙으면 올린 뒤 받은 경로만 담도록 바꾼다
+- 고르면 바로 서버에 올리고, 받은 경로만 대장에 저장한다
 
 ## 디자인
 
@@ -108,7 +139,9 @@ API 호출로 바꾸면 되고, 화면 코드는 고치지 않아도 된다.
 
 ```
 src/
-  data/              자료를 넣고 꺼내는 곳 (나중에 서버 연동으로 바꿀 자리)
+  api/               서버를 부르는 자리 (주소·토큰·오류·칸 이름 변환)
+  data/              화면이 쓰는 자료 창구 (로그인·설정·대장·사진)
+  useAsync.js        API 호출을 "불러오는 중 / 오류 / 결과" 로 다루는 도우미
   referenceContext.js 설정·담당자 목록을 화면에 넘기는 통로와 번호 → 이름 도우미
   constants.js       설정으로 바꾸지 않는 고정 값 (습득자 구분, 연락 여부)
   dateUtil.js        날짜 계산과 보관만료일 미리보기
@@ -121,6 +154,7 @@ src/
                      AppLayout(왼쪽 메뉴 틀) · PageHeader · ManageNoBadge · Section
                      Field(이름 + 입력칸, 상세에서는 값만) · PhotoBox(사진 넘겨보기)
                      StatusPill(처리상태 표시) · ListToolbar · Pagination · icons
+                     ReferenceProvider(설정·담당자 준비) · StatusBox(불러오는 중·오류)
   pages/             LoginPage · FoundListPage · FoundItemPage · FoundReturnPage
                      LostListPage · LostReportPage · LostMatchPage · SettingsPage
 ```

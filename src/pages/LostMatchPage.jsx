@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { reportApi, foundApi, matchReport } from "../data/records";
-import { useReference, nameOf } from "../referenceContext";
+import { imageUrl } from "../api/client";
+import { useReference, nameOf, byCode } from "../referenceContext";
+import { useAsync } from "../useAsync";
+import { toMessage } from "../api/client";
+import { LoadingBox, ErrorBox } from "../components/StatusBox";
 import PageHeader from "../components/PageHeader";
 import ManageNoBadge from "../components/ManageNoBadge";
 import ActionBar from "../components/ActionBar";
@@ -18,19 +22,40 @@ const COLUMNS = [["", 8], ["관리번호", 13], ["사진", 12], ["물품명", 27
 export default function LostMatchPage() {
   const navigate = useNavigate();
   const { manageNo } = useParams();
+
+  // 신고 한 건과 고를 수 있는 분실물 목록을 함께 받아온다.
+  const { data, loading, error, reload } = useAsync(async () => {
+    const [report, founds] = await Promise.all([reportApi.get(manageNo), foundApi.list()]);
+    return { report, founds };
+  }, [manageNo]);
+
+  if (loading) return <LoadingBox />;
+  if (error) {
+    return (
+      <ErrorBox message={error} onRetry={reload}>
+        <button className="btn" onClick={() => navigate("/lost")}>목록으로</button>
+      </ErrorBox>
+    );
+  }
+  return <MatchBody manageNo={manageNo} report={data.report} founds={data.founds} />;
+}
+
+function MatchBody({ manageNo, report, founds }) {
+  const navigate = useNavigate();
   const ref = useReference();
-  const report = reportApi.get(manageNo);
 
   const [keyword, setKeyword] = useState("");
   const [sameCategory, setSameCategory] = useState(true);
   const [picked, setPicked] = useState(null);
   const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
 
   if (!report) return <NotFoundBox manageNo={manageNo} backTo="/lost" />;
 
-  const doneStatusId = ref.statuses.find((s) => s.name.includes("완료"))?.id ?? ref.statuses[0]?.id;
+  // 처리완료 상태는 이름이 아니라 code 로 찾는다.
+  const doneStatusId = byCode(ref.statuses, "DONE", "완료")?.id ?? ref.statuses[0]?.id;
 
-  const rows = foundApi.list()
+  const rows = founds
     .map((it) => ({
       ...it,
       categoryName: nameOf(ref.categories, it.categoryId),
@@ -45,10 +70,17 @@ export default function LostMatchPage() {
         .filter(Boolean).join(" ").toLowerCase().includes(k);
     });
 
-  function handleMatch() {
+  async function handleMatch() {
     if (!picked) return setError("연결할 분실물을 고르세요.");
-    matchReport(manageNo, picked, doneStatusId);
-    navigate(`/lost/${manageNo}`, { replace: true });
+    if (sending) return;
+    setSending(true);
+    try {
+      await matchReport(manageNo, picked, doneStatusId);
+      navigate(`/lost/${manageNo}`, { replace: true });
+    } catch (err) {
+      setError(toMessage(err, "연결하지 못했습니다."));
+      setSending(false);
+    }
   }
 
   return (
@@ -104,7 +136,7 @@ export default function LostMatchPage() {
                   </label>
                 </td>
                 <td>{it.manageNo}</td>
-                <td><div className="thumb">{it.images?.[0] && <img src={it.images[0]} alt="" />}</div></td>
+                <td><div className="thumb">{it.images?.[0] && <img src={imageUrl(it.images[0])} alt="" />}</div></td>
                 <td className="cell-left">
                   <div className="item-name">{it.itemName}</div>
                   {it.foundPlace && <div className="item-sub">{it.foundPlace}</div>}
@@ -120,7 +152,9 @@ export default function LostMatchPage() {
 
       <ActionBar message={error}>
         <button type="button" className="btn" onClick={() => navigate(`/lost/${manageNo}`)}>취소</button>
-        <button type="button" className="btn primary" onClick={handleMatch}>연결</button>
+        <button type="button" className="btn primary" disabled={sending} onClick={handleMatch}>
+          {sending ? "연결하는 중..." : "연결"}
+        </button>
       </ActionBar>
     </>
   );

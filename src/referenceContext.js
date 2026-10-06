@@ -35,3 +35,16 @@ export function filterOptions(list) {
     label: row.is_active ? row.name : `${row.name} (사용중지)`,
   }));
 }
+
+/**
+ * 뜻이 정해진 설정 항목을 code 로 찾는다.
+ * 관리자가 이름을 바꿔도 화면 동작이 흔들리지 않게 하기 위해서다.
+ * code 가 아직 없는 서버를 대비해 이름으로도 한 번 더 찾는다.
+ * @param {object[]} list 설정 목록
+ * @param {string} code   STORED · RETURNED · OPEN · DONE 등
+ * @param {string} [nameHint] code 가 없을 때 찾아볼 이름 조각
+ */
+export function byCode(list, code, nameHint) {
+  return list.find((row) => row.code === code)
+    ?? (nameHint ? list.find((row) => row.name.includes(nameHint)) : undefined);
+}

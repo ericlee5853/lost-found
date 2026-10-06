@@ -5,6 +5,8 @@ import { reportApi } from "../data/records";
 import { useReference, nameOf, filterOptions } from "../referenceContext";
 import { useStickyState } from "../useStickyState";
 import { today } from "../dateUtil";
+import { useAsync } from "../useAsync";
+import { LoadingBox, ErrorBox } from "../components/StatusBox";
 import PageHeader from "../components/PageHeader";
 import Pagination from "../components/Pagination";
 import StatusPill from "../components/StatusPill";
@@ -36,7 +38,9 @@ export default function LostListPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
 
-  const rows = reportApi.list().map((it) => ({
+  const { data, loading, error, reload } = useAsync(() => reportApi.list(), []);
+
+  const rows = (data ?? []).map((it) => ({
     ...it,
     categoryName: nameOf(ref.categories, it.categoryId),
     statusName: nameOf(ref.statuses, it.statusId),
@@ -73,6 +77,9 @@ export default function LostListPage() {
     XLSX.utils.book_append_sheet(book, sheet, "분실신고관리대장");
     XLSX.writeFile(book, `분실신고관리대장_${today()}.xlsx`);
   }
+
+  if (loading) return <LoadingBox message="분실신고 대장을 불러오는 중입니다..." />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
 
   return (
     <>
