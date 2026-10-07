@@ -3,7 +3,8 @@
 교내 분실물(습득물)과 분실신고를 접수·조회·처리하는 관리 프로그램.
 React + Vite 로 만들었고, 모든 자료는 백엔드 API 서버에서 가져온다.
 
-백엔드가 지켜야 할 규칙은 [docs/api-spec.md](docs/api-spec.md) 에 있다.
+백엔드가 지켜야 할 규칙은 [docs/api-spec.md](docs/api-spec.md) 하나에 모아 두었다.
+기존 연동 가이드에서 바뀌는 부분은 그 문서 0장에 정리되어 있다.
 
 ## 실행
 
@@ -100,8 +101,10 @@ VITE_DEV_API_STRIP_BASE=true
 | `data/records.js` | 두 대장과 연결 |
 | `data/uploads.js` | 사진 올리기 |
 
-주고받는 규격은 [docs/api-spec.md](docs/api-spec.md), 표와 칸은
-[docs/data-model.md](docs/data-model.md) 에 있다.
+| 문서 | 내용 |
+| --- | --- |
+| [docs/api-spec.md](docs/api-spec.md) | 백엔드 API 규칙 전체. 0장에 기존 가이드 대비 변경점 |
+| [docs/data-model.md](docs/data-model.md) | 표와 칸 |
 
 ### 설정값을 다루는 세 가지 규칙
 
