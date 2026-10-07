@@ -434,7 +434,16 @@ Authorization: Bearer {access_token}
   25MB 를 넘으면 413 이다.
 - 올린 파일은 `/founder/uploads/...` 로 열 수 있어야 한다.
 
-바로 쓸 수 있는 FastAPI 코드가 `backend/uploads.py` 에 있다.
+### 만들 때 참고
+
+- 저장 폴더는 **다시 배포해도 지워지지 않는 경로**를 쓰고 백업 대상에 넣는다.
+  예) `/var/lib/lost-found/uploads`
+- 파일은 `연도/월` 폴더로 나눠 저장하면 한 폴더에 쌓이지 않는다.
+  예) `/uploads/2026/10/3f9a...c1.jpg`
+- 저장한 파일을 정적 파일로 열어 준다(FastAPI 면 `StaticFiles` 를 `/uploads` 에 붙인다).
+  웹서버에서는 `location ^~ /founder/uploads/` 를 백엔드로 넘긴다.
+- 사진을 바꾸거나 대장을 지워도 예전 파일은 서버에 남는다. 정리용으로
+  `DELETE /things/uploads?image_path=...` 를 함께 두면 좋다. 화면은 부르지 않는다.
 
 ## 7. 꼭 지켜야 할 세 가지
 

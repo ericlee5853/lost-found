@@ -3,8 +3,8 @@
 교내 분실물(습득물)과 분실신고를 접수·조회·처리하는 관리 프로그램.
 React + Vite 로 만들었고, 모든 자료는 백엔드 API 서버에서 가져온다.
 
-백엔드가 지켜야 할 규칙은 [docs/api-spec.md](docs/api-spec.md) 하나에 모아 두었다.
-기존 연동 가이드에서 바뀌는 부분은 그 문서 0장에 정리되어 있다.
+백엔드에 넘길 자료는 [docs/backend/](docs/backend/) 에 모아 두었다.
+기존 연동 가이드에서 바뀌는 부분은 [api-spec.md](docs/backend/api-spec.md) 0장에 있다.
 
 ## 실행
 
@@ -49,19 +49,13 @@ location /founder/ {
 | --- | --- | --- |
 | `VITE_BASE_PATH` | 화면을 올릴 경로 | `/founder/` |
 | `VITE_API_BASE_URL` | API 주소. 비우면 화면과 같은 경로 | (비움) |
-| `VITE_DEV_API_TARGET` | 개발 서버가 API 요청을 넘겨줄 서버 | 운영 서버 |
-| `VITE_DEV_API_STRIP_BASE` | 넘길 때 앞의 `/founder` 를 뗄지 | `false` |
+| `VITE_DEV_API_TARGET` | 개발 서버가 API 요청을 넘겨줄 서버 | 학교 서버 |
 
 개발할 때는 `npm run dev` 로 띄운 뒤 `http://localhost:5173/founder/` 로 연다.
 API 요청은 개발 서버가 넘겨주므로 주소가 같아 보이고 CORS 문제가 없다.
 
-백엔드를 직접 띄워(예: `http://localhost:8000`) 붙일 때는 `.env` 에 아래 두 줄을 넣는다.
-그 서버에는 `/founder` 경로가 없어서 떼고 넘겨야 하기 때문이다.
-
-```
-VITE_DEV_API_TARGET=http://localhost:8000
-VITE_DEV_API_STRIP_BASE=true
-```
+API 요청은 학교 서버(`https://campuslife.dongyang.ac.kr`)로 넘어간다.
+다른 서버를 보려면 `.env` 의 `VITE_DEV_API_TARGET` 만 바꾼다.
 
 ### 로그인
 
@@ -103,8 +97,8 @@ VITE_DEV_API_STRIP_BASE=true
 
 | 문서 | 내용 |
 | --- | --- |
-| [docs/api-spec.md](docs/api-spec.md) | 백엔드 API 규칙 전체. 0장에 기존 가이드 대비 변경점 |
-| [docs/data-model.md](docs/data-model.md) | 표와 칸 |
+| [docs/backend/api-spec.md](docs/backend/api-spec.md) | 백엔드 API 규칙 전체. 0장에 기존 가이드 대비 변경점 |
+| [docs/backend/data-model.md](docs/backend/data-model.md) | DB 표와 칸 |
 
 ### 설정값을 다루는 세 가지 규칙
 
@@ -162,9 +156,8 @@ src/
                      LostListPage · LostReportPage · LostMatchPage · SettingsPage
 ```
 
-백엔드에 붙일 코드와 문서는 따로 있다.
+문서는 `docs/` 에 있다.
 
 ```
-backend/   사진 업로드 API (FastAPI 라우터)
-docs/      데이터 구조 · 화면 흐름 · 화면 시안 그림
+docs/   백엔드 API 규칙 · 데이터 구조 · 화면 흐름 · 화면 시안 그림
 ```
